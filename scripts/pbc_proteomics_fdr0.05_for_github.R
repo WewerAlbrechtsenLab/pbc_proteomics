@@ -27,8 +27,10 @@ library(plotly)
 
 #### from http://www.sthda.com/english/articles/22-principal-component-methods-videos/65-pca-in-r-using-factominer-quick-scripts-and-videos/ ###
 
-# import baseline characteristics from "merged" document created with "p_baseline_characteristics.R"
+# Create output directory
+dir.create("../output/PCA", recursive = TRUE, showWarnings = FALSE)
 
+# import baseline characteristics from "merged" document created with "p_baseline_characteristics.R"
 pca_p <- read.csv("../data/plasma_characteristics.csv")
 
 pca_p$group <- factor(pca_p$group)
@@ -105,7 +107,7 @@ eig.val.p <- res.pca.p$eig
 # By diagnosis
 
 # save plot
-# jpeg(file = "../output/PCA/pca_plasma_diagnosis_pbc_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_plasma_diagnosis_pbc_masld_healthy.jpeg")
 
 fviz_pca_ind(res.pca.p, 
              geom.ind = "point", 
@@ -166,89 +168,16 @@ pca_3d_plot_p
 
 
 # save plot
-# htmlwidgets::saveWidget(
-#   pca_3d_plot_p,
-#   "../output/PCA/pca_3d_plasma_diagnosis.html",
-#   selfcontained = TRUE
-# )
+htmlwidgets::saveWidget(
+ pca_3d_plot_p,
+ "../output/PCA/pca_3d_plasma_diagnosis.html",
+ selfcontained = TRUE
+)
 
 
-###### 3D PCA without subject IDs ######
-
-pca_3d_plot_p_no_ids <- plot_ly(
-  data = pca_3d_p,
-  x = ~Dim.1,
-  y = ~Dim.2,
-  z = ~Dim.3,
-  color = ~group,
-  colors = c("#58aadb", "grey", "#AA0233"),
-  text = ~paste("Group:", group),
-  hoverinfo = "text",
-  type = "scatter3d",
-  mode = "markers",
-  marker = list(size = 5)
-) %>%
-  layout(
-    title = "3D PCA plasma",
-    scene = list(
-      xaxis = list(title = paste0("PC1 (", round(eig.val.p[1, 2], 1), "%)")),
-      yaxis = list(title = paste0("PC2 (", round(eig.val.p[2, 2], 1), "%)")),
-      zaxis = list(title = paste0("PC3 (", round(eig.val.p[3, 2], 1), "%)"))
-    ),
-    legend = list(title = list(text = "Diagnosis"))
-  )
-
-pca_3d_plot_p_no_ids
-
-# save plot
-# htmlwidgets::saveWidget(
-#   pca_3d_plot_p_no_ids,
-#   "../output/PCA/pca_3d_plasma_diagnosis_no_IDs.html",
-#   selfcontained = TRUE
-# )
 
 
 ############ Identify potential outliers ###############
-
-
-# PCA plot with sample IDs
-# Save PCA plot with sample IDs
-# jpeg(
-#   file = "../output/PCA/pca_plasma_diagnosis_with_IDs.jpeg",
-#   width = 3000,
-#   height = 2500,
-#   res = 300
-# )
-
-
-fviz_pca_ind(
-  res.pca.p,
-  geom.ind = "point",
-  col.ind = pca_p$group,
-  palette = c("#58aadb", "grey", "#AA0233"),
-  pointsize = 3,
-  pointshape = 19,
-  invisible = "quali",
-  legend.title = "Diagnosis",
-  repel = TRUE
-) +
-  geom_text_repel(
-    aes(label = pca_p$subject),
-    size = 3,
-    max.overlaps = Inf
-  ) +
-  ggtitle("Individuals - PCA plasma with sample IDs") +
-  theme(
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18),
-    legend.position = "bottom"
-  )
-
-dev.off()
-
 
 # PCA coordinates
 pca_coord <- as.data.frame(res.pca.p$ind$coord[,1:5])
@@ -275,114 +204,10 @@ outliers <- pca_coord[pca_coord$Mahalanobis > threshold, ]
 plasma_outlier_ids <- c("FALL_1", "FALL_36")
 
 
-
-###### PCA without outliers ######
-
-# Remove outliers
-pca_p_no_outliers <- pca_p %>%
-  filter(!subject %in% plasma_outlier_ids)
-
-# Check dimensions
-dim(pca_p)
-dim(pca_p_no_outliers)
-
-# Check that outliers are removed
-subset(pca_p_no_outliers, subject %in% plasma_outlier_ids)
-
-
-# Now to PCA
-res.pca.p.no_outliers <- PCA(
-  pca_p_no_outliers,
-  graph = FALSE,
-  quali.sup = c("subject","sex","cirrose","con_masld",
-                "group","group_1","group_urso"),
-  quanti.sup = c("bmi","age")
-)
-
-# Show the percentage of variances explained by each principal component
-eig.val.p.no_outliers <- res.pca.p.no_outliers$eig
-
-#n.pc.p.no_outliers <- min(10, nrow(eig.val.p.no_outliers))
-#
-#barplot(
-#  eig.val.p.no_outliers[1:n.pc.p.no_outliers, 2],
-#  names.arg = 1:n.pc.p.no_outliers,
-#  main = "Variances Explained by PCs (%)",
-#  xlab = "Principal Components",
-#  ylab = "Percentage of variance",
-#  col = "steelblue"
-#)
-
-# Visualize the graph of individuals. Individuals with a similar profile are grouped together.
-
-# By diagnosis
-
-fviz_pca_ind(
-  res.pca.p.no_outliers,
-  geom.ind = "point",
-  col.ind = pca_p_no_outliers$group,
-  palette = c("#58aadb","grey","#AA0233"),
-  pointsize = 3,
-  pointshape = 19,
-  invisible = "quali",
-  legend.title = "Diagnosis"
-) +
-  ggtitle("Individuals - PCA plasma without outliers") +
-  theme(
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18),
-    legend.position = "bottom"
-  )
-
-# Save plot
-# ggsave(
-#   "../output/PCA/pca_plasma_diagnosis_without_outliers.jpeg",
-#   width = 10,
-#   height = 8,
-#   device = "jpeg"
-# )
-
-
-###### PCA with and without MASLD 
-
-# save plot
-# jpeg(file = "../output/PCA/pca_plasma_diagnosis_pbc_con.masld_masld_healthy.jpeg")
-
-fviz_pca_ind(res.pca.p, 
-             geom.ind = "point", # default is point + text and text is 1:n samples
-             col.ind = pca_p$group_1, # color by group
-             palette = c("#dba458","#58aadb","grey","#AA0233"),             
-             pointsize = 3, # increased size
-             pointshape = 19, # makes circles
-             invisible = "quali", # removes centroids (group mean dots/points)
-             legend.title = "Diagnosis") +
-  ggtitle("Individuals - PCA plasma")
-
-dev.off()
-
-# By sex
-
-# save plot
-# jpeg(file = "../output/PCA/pca_plasma_sex_pbc_masld_healthy.jpeg")
-
-fviz_pca_ind(res.pca.p, 
-             geom.ind = "point", # default er c("point","text") 
-             col.ind = pca_p$sex,
-             pointsize = 3,
-             pointshape = 19,
-             invisible = "quali",
-             legend.title = "Sex") +
-  ggtitle("Individuals - PCA plasma")
-
-# dev.off()
-
 # By cirrhosis
 
 # save plot
-# jpeg(file = "../output/PCA/pca_plasma_cirrosis_pbc_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_plasma_cirrhosis_pbc_masld_healthy.jpeg")
  
 fviz_pca_ind(res.pca.p, 
              geom.ind = "point", # default er c("point","text") 
@@ -401,9 +226,8 @@ fviz_pca_ind(res.pca.p,
     legend.position = "bottom"              # Move legend to the bottom
   )
 
-# dev.off()
+dev.off()
 
-# Cirrhosis cluster together
 
 # subset only pbc and healthy
 pca_p_pbc <- subset(pca_p, group %in% c("PBC","Healthy"))
@@ -431,7 +255,7 @@ eig.val.p.pbc <- res.pca.p.pbc$eig
 # Visualize the graph of individuals. Individuals with a similar profile are grouped together.
 
 # By diagnosis
-# jpeg(file = "../output/PCA/pca_plasma_diagnosis_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_plasma_diagnosis_pbc_healthy.jpeg")
 
 fviz_pca_ind(res.pca.p.pbc, 
              geom.ind = "point", # default is point + text and text is 1:n samples
@@ -443,10 +267,10 @@ fviz_pca_ind(res.pca.p.pbc,
              legend.title = "Diagnosis") +
   ggtitle("Individuals - PCA plasma")
 
-# dev.off()
+dev.off()
 
 # By sex
-# jpeg(file = "../output/PCA/pca_plasma_sex_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_plasma_sex_pbc_healthy.jpeg")
  
 
 fviz_pca_ind(res.pca.p.pbc, 
@@ -458,10 +282,10 @@ fviz_pca_ind(res.pca.p.pbc,
              legend.title = "Sex") +
   ggtitle("Individuals - PCA plasma")
 
-# dev.off()
+dev.off()
 
 # By cirrhosis
-# jpeg(file = "../output/PCA/pca_plasma_cirrhosis_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_plasma_cirrhosis_pbc_healthy.jpeg")
  
 fviz_pca_ind(res.pca.p.pbc, 
              geom.ind = "point", # default er c("point","text") 
@@ -472,9 +296,9 @@ fviz_pca_ind(res.pca.p.pbc,
              legend.title = "Cirrhosis") +
   ggtitle("Individuals - PCA plasma")
 
-# dev.off()
+dev.off()
 
-# Cirrhosis cluster together
+
 
 
 ################## Differential expression analysis plasma ########################################################
@@ -565,6 +389,11 @@ dim(p_no_masld)
 
 ############### PBC vs. healthy - all individuals ################### 
 
+# Create output directory
+dir.create("../output/FDR0.05_all/PBC_vs_Healthy/All",
+           recursive = TRUE,
+           showWarnings = FALSE)
+
 p_pbc <- subset(p, group %in% c("PBC","Healthy"))
 levels(p_pbc$group)
 table(p_pbc$group)
@@ -612,20 +441,20 @@ tmp_p_pbc
 ### Diagnostic plots:
 # Scatterplot of residual-variances vs average log-expression
 # save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/plotSA_pbc_vs_healthy_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/plotSA_pbc_vs_healthy_plasma.jpeg")
 
 plotSA(tmp_p_pbc, main = "Residual variances vs. average log-expression, PBC vs. Healthy, Plasma")
 
-# dev.off()
+dev.off()
 
 
 # Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
 # save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/MD-plot_pbc_vs_healthy_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/MD-plot_pbc_vs_healthy_plasma.jpeg")
 
 plotMD(tmp_p_pbc, main = "Mean-difference plot, PBC vs. Healthy, Plasma") 
 
-# dev.off()
+dev.off()
 
 
 # Extract results
@@ -731,18 +560,10 @@ volcano_plot_p_pbc <- ggplot(results.p.pbc) +
 
 volcano_plot_p_pbc
 
-
-
-
-#### Check if proteins are up/downregulated in PBC compared to controlgroup ####
-# tapply(p$PIGR.P01833,p$group,mean) 
-# "checking that up and downregulated are correct (-1,+1)"
-# tapply(p$TTR.P02766,p$group, mean)
-
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/volcano_plasma_pbc_healthy_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/volcano_plasma_pbc_healthy_fdr0.05.jpeg",
+        width = 10, height = 10, plot = volcano_plot_p_pbc, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -782,6 +603,13 @@ down_plasma_pbc_vs_healthy <-
 
 
 ############### PBC vs. healthy - without outliers ################### 
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 p_pbc_no_outliers <- subset(p_no_outliers, group %in% c("PBC","Healthy"))
 
@@ -843,27 +671,27 @@ tmp_p_pbc_no_outliers
 # Scatterplot of residual-variances vs average log-expression
 # save plot
 
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/plotSA_pbc_vs_healthy_without_outliers_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/plotSA_pbc_vs_healthy_without_outliers_plasma.jpeg")
 
 plotSA(
   tmp_p_pbc_no_outliers,
   main = "Residual variances vs. average log-expression, PBC vs. Healthy without outliers, Plasma"
 )
 
-#dev.off()
+dev.off()
 
 
 # Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
 # save plot
 
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/MD-plot_pbc_vs_healthy_without_outliers_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/MD-plot_pbc_vs_healthy_without_outliers_plasma.jpeg")
 
 plotMD(
   tmp_p_pbc_no_outliers,
   main = "Mean-difference plot, PBC vs. Healthy without outliers, Plasma"
 )
 
-# dev.off()
+dev.off()
 
 # Extract results
 
@@ -960,8 +788,8 @@ volcano_plot_p_pbc_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/volcano_plasma_pbc_healthy_without_outliers_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/volcano_plasma_pbc_healthy_without_outliers_fdr0.05.jpeg",
+        width = 10, height = 10, plot = volcano_plot_p_pbc_no_outliers, device = "jpeg")
 
 # Number of upregulated proteins in PBC without outliers: #53
 
@@ -1028,7 +856,15 @@ down_plasma_pbc_vs_healthy_no_outliers <-
   sorted_downregulated_proteins_p_pbc_no_outliers[, 
                                                   c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")]
 
-#################### PBV vs healthy without cirrhosis ################################################
+
+#################### PBC vs healthy without cirrhosis ################################################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 p_pbc_no_c <- subset(p_no_c, group %in% c("PBC","Healthy"))
 levels(p_pbc_no_c$group)
@@ -1059,17 +895,17 @@ tmp_p_pbc_no_c <- eBayes(tmp_p_pbc_no_c)
 ### Diagnostic plots:
 # Scatterplot of residual-variances vs average log-expression
 # save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/plotSA_pbc_vs_healthy_plasma_no.cirrhosis.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/plotSA_pbc_vs_healthy_plasma_no.cirrhosis.jpeg")
 
-#plotSA(tmp_p_pbc_no_c, main = "Residual variances vs. average log-expression, non-cirrhotic PBC vs. Healthy, Plasma")
-#dev.off()
+plotSA(tmp_p_pbc_no_c, main = "Residual variances vs. average log-expression, non-cirrhotic PBC vs. Healthy, Plasma")
+dev.off()
 
 # Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
 # save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/MD-plot_pbc_vs_healthy_plasma_no.cirrhosis.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/MD-plot_pbc_vs_healthy_plasma_no.cirrhosis.jpeg")
 
-#plotMD(tmp_p_pbc_no_c, main = "Mean-difference plot, non-cirrhotic PBC vs. Healthy, Plasma") 
-#dev.off()
+plotMD(tmp_p_pbc_no_c, main = "Mean-difference plot, non-cirrhotic PBC vs. Healthy, Plasma") 
+dev.off()
 
 # Extract results
 top.table.p.pbc.no.c <- topTable(tmp_p_pbc_no_c, coef = 1, sort.by = "P", n = Inf) #default is "BH" which is alias of "fdr"
@@ -1088,10 +924,101 @@ results.p.pbc.no.c$log2FC <- results.p.pbc.no.c$logFC
 results.p.pbc.no.c[1:3,c(1,8:11)]
 
 
+#### Volcano PBC without cirrhosis  
+
+# Identify proteins that meet the filtering criteria
+
+selected_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
+  filter(adj.P.Val < 0.05)
+
+selected_proteins_p_pbc_no_c[1:5,1:5]
+
+volcano_plot_p_pbc_no_c <- ggplot(results.p.pbc.no.c) +
+  geom_point(aes(x = logFC, y = -log10(adj.P.Val), 
+                 color = ifelse(logFC <= -0.00001 & adj.P.Val < 0.05, 'blue', 
+                                ifelse(logFC >= 0.00001 & adj.P.Val < 0.05, 'red', 'grey')))) +
+  geom_text(data = selected_proteins_p_pbc_no_c,
+            aes(x = logFC, y = -log10(adj.P.Val), 
+                label = GeneName),
+            size = 3, hjust = 0, vjust = 0) +
+  scale_color_identity() +
+  labs(x = "log2(FC)", y = "-log10(adj P value)") +
+  ggtitle("Differential Plasma Protein Expression, non-cirrhotic PBC vs. Healthy") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18),
+    plot.title = element_text(size = 20)
+  )
+
+volcano_plot_p_pbc_no_c
+
+# Save plot
+
+ggsave(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/volcano_plasma_pbc_healthy_fdr0.05_no.cirrhosis.jpeg",
+  width = 10,
+  height = 10,
+  plot = volcano_plot_p_pbc_no_c,
+  device = "jpeg"
+)
+
+# Number of upregulated proteins in PBC without cirrhosis vs Healthy:
+
+selected_upregulated_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
+  filter(logFC >= 0.0001 & adj.P.Val < 0.05)
+
+nrow(selected_upregulated_proteins_p_pbc_no_c) # 38
+
+# Number of downregulated proteins in PBC:
+
+selected_downregulated_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
+  filter(logFC < 0.0001 & adj.P.Val < 0.05)
+
+nrow(selected_downregulated_proteins_p_pbc_no_c) # 51
+
+# Sort the upregulated proteins by adjusted p-value
+
+sorted_upregulated_proteins_p_pbc_no_c <- 
+  arrange(subset(results.p.pbc.no.c, logFC >= 0.0001 & adj.P.Val < 0.05), adj.P.Val)
+
+# Display the sorted list of upregulated proteins with gene names
+
+print(sorted_upregulated_proteins_p_pbc_no_c[, 
+                                             c("GeneName.UniprotID", "GeneName", "UniProtID", "log2FC", "adj.P.Val")])
+
+# Create a data frame with the desired output
+
+up_plasma_pbc_vs_healthy_no_c <- 
+  sorted_upregulated_proteins_p_pbc_no_c[, 
+                                         c("GeneName.UniprotID", "GeneName", "UniProtID", "log2FC", "adj.P.Val")]
+
+# Sort the downregulated proteins by adjusted p-value
+
+sorted_downregulated_proteins_p_pbc_no_c <- 
+  arrange(subset(results.p.pbc.no.c, logFC <= -0.0001 & adj.P.Val < 0.05), adj.P.Val)
+
+# Display the sorted list of downregulated proteins with gene names
+
+print(sorted_downregulated_proteins_p_pbc_no_c[, 
+                                               c("GeneName.UniprotID", "GeneName", "UniProtID", "log2FC", "adj.P.Val")])
+
+# Create a data frame with the desired output
+
+down_plasma_pbc_vs_healthy_no_c <- 
+  sorted_downregulated_proteins_p_pbc_no_c[, 
+                                           c("GeneName.UniprotID", "GeneName", "UniProtID", "log2FC", "adj.P.Val")]
 
 
 
 ############## Differential expression PBC vs MASLD ###################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_MASLD/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 p_pbc_masld <- subset(p, group %in% c("PBC","NAFLD"))
 levels(p_pbc_masld$group)
@@ -1176,8 +1103,8 @@ volcano_plot_p_pbc_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/volcano_plasma_pbc_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/volcano_plasma_pbc_masld_fdr0.05.jpeg",
+        width = 10, height = 10, plot = volcano_plot_p_pbc_masld, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -1224,8 +1151,14 @@ down_plasma_pbc_vs_masld <-
   sorted_downregulated_proteins_p_pbc_masld[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")]
 
 
-
 #################### PBC vs MASLD without cirrhosis ################################################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 p_pbc_masld_no_c <- subset(p_no_c, group %in% c("PBC","NAFLD"))
 levels(p_pbc_masld_no_c$group)
@@ -1300,8 +1233,8 @@ volcano_plot_p_pbc_masld_no_c
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/volcano_plasma_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_masld_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/volcano_plasma_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
+        width = 10, height = 10, plot = volcano_plot_p_pbc_masld_no_c, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -1348,6 +1281,13 @@ down_plasma_pbc_vs_masld_no_c <-
 
 ############## DE PBC without MASLD ################################
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 p_pbc_no_masld <- subset(p_no_masld, group %in% c("PBC","Healthy"))
 levels(p_pbc_no_masld$group)
 table(p_pbc_no_masld$group)
@@ -1374,19 +1314,6 @@ tmp_p_pbc_no_masld <- eBayes(tmp_p_pbc_no_masld)
 
 
 
-### Diagnostic plots:
-# Scatterplot of residual-variances vs average log-expression
-# save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/plotSA_pbc_vs_healthy_plasma_no.masld.jpeg")
-# plotSA(tmp_p_pbc_no_masld, main = "Residual variances vs. average log-expression, PBC without MASLD vs. Healthy, Plasma")
-# dev.off()
-
-# Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
-# save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/MD-plot_pbc_vs_healthy_plasma_no.masld.jpeg")
-# plotMD(tmp_p_pbc_no_masld, main = "Mean-difference plot, PBC without MASLD vs. Healthy, Plasma") 
-# dev.off()
-
 # Extract results
 top.table.p.pbc.no.masld <- topTable(tmp_p_pbc_no_masld, coef = 1, sort.by = "P", n = Inf) #default is "BH" which is alias of "fdr"
 results.p.pbc.no.masld <-  as.data.frame(top.table.p.pbc.no.masld)
@@ -1402,75 +1329,6 @@ results.p.pbc.no.masld$GeneName.UniprotID <- results.p.pbc.no.masld$protein
 results.p.pbc.no.masld[60:80,6:10]
 results.p.pbc.no.masld$log2FC <- results.p.pbc.no.masld$logFC
 results.p.pbc.no.masld[1:3,c(1,8:11)]
-
-
-#### Volcano PBC without cirrhosis  
-
-# Identify proteins that meet the filtering criteria
-
-selected_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
-  filter(adj.P.Val < 0.05)
-
-selected_proteins_p_pbc_no_c[1:5,1:5]
-
-volcano_plot_p_pbc_no_c <- ggplot(results.p.pbc.no.c) +
-  geom_point(aes(x = logFC, y = -log10(adj.P.Val), 
-                 color = ifelse(logFC <= -0.00001  & adj.P.Val < 0.05, 'blue', 
-                                ifelse(logFC >= 0.00001 & adj.P.Val < 0.05, 'red', 'grey')))) +
-  geom_text(data = selected_proteins_p_pbc_no_c,
-            aes(x = logFC, y = -log10(adj.P.Val), 
-                label = GeneName),
-            size = 3, hjust = 0, vjust = 0) +
-  scale_color_identity() +
-  labs(x = "log2(FC)", y = "-log10(adj P value)") +
-  ggtitle("Differential Plasma Protein Expression, non-cirrhotic PBC vs. Healthy")+
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray")+  # Add horizontal line
-  theme(
-    axis.title = element_text(size = 20),  # Increase axis title size
-    axis.text = element_text(size = 18),   # Increase axis text (tick labels) size
-    plot.title = element_text(size = 20)   # Increase plot title size
-  )
-
-volcano_plot_p_pbc_no_c
-
-#save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/volcano_plasma_pbc_healthy_fdr0.05_no.cirrhosis.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_no_c, device = "jpeg")
-
-# Number of upregulated proteins in PBC without cirrhosis vs Healthy:
-
-selected_upregulated_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
-  filter(logFC >= 0.0001 & adj.P.Val < 0.05)
-nrow(selected_upregulated_proteins_p_pbc_no_c) # 38
-
-# Number of downregulated proteins in PBC:
-selected_downregulated_proteins_p_pbc_no_c <- results.p.pbc.no.c %>%
-  filter(logFC < 0.0001 & adj.P.Val < 0.05)
-nrow(selected_downregulated_proteins_p_pbc_no_c) # 51
-
-# Sort the upregulated proteins by adjusted p-value
-sorted_upregulated_proteins_p_pbc_no_c <- 
-  arrange(subset(results.p.pbc.no.c, logFC >= 0.0001 & adj.P.Val < 0.05), adj.P.Val)
-
-# Display the sorted list of upregulated proteins with gene names
-print(sorted_upregulated_proteins_p_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")])
-
-# Create a data frame with the desired output
-up_plasma_pbc_vs_healthy_no_c <- 
-  sorted_upregulated_proteins_p_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")]
-
-# Sort the downregulated proteins by adjusted p-value
-sorted_downregulated_proteins_p_pbc_no_c <- 
-  arrange(subset(results.p.pbc.no.c, logFC <= -0.0001 & adj.P.Val < 0.05), adj.P.Val)
-
-# Display the sorted list of downregulated proteins with gene names
-print(sorted_downregulated_proteins_p_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")])
-
-# Create a data frame with the desired output
-down_plasma_pbc_vs_healthy_no_c <- 
-  sorted_downregulated_proteins_p_pbc_no_c[, c("GeneName.UniprotID","GeneName","UniProtID", "log2FC", "adj.P.Val")]
-
 
 
 #### Volcano PBC without MASLD 
@@ -1504,8 +1362,8 @@ volcano_plot_p_pbc_no_masld
 
 #save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/volcano_plasma_pbc_healthy_fdr0.05_no.masld.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/volcano_plasma_pbc_healthy_fdr0.05_no.masld.jpeg",
+        width = 10, height = 10, plot = volcano_plot_p_pbc_no_masld, device = "jpeg")
 
 
 # Number of upregulated proteins in PBC without MASLD vs Healthy:
@@ -1543,7 +1401,17 @@ down_plasma_pbc_vs_healthy_no_masld <-
 
 
 
+##### NÅET hertil 240926 ######
+
+
 ################## PBC vs Healthy and MASLD - all individuals
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Check the new group counts
 table(p$group_1)
@@ -1576,13 +1444,13 @@ tmp_p_pbc_h.m
 
 ### Diagnostic plots:
 # Scatterplot of residual-variances vs average log-expression
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/plotSA_pbc_vs_healthy_and_masld_plasma.jpeg")
-# plotSA(tmp_p_pbc_h.m, main = "Residual variances vs. average log-expression, PBC vs. Healthy and MASLD, Plasma")
-# dev.off()
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/plotSA_pbc_vs_healthy_and_masld_plasma.jpeg")
+plotSA(tmp_p_pbc_h.m, main = "Residual variances vs. average log-expression, PBC vs. Healthy and MASLD, Plasma")
+dev.off()
 
 # Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/MD-plot_pbc_vs_healthy_and_masld_plasma.jpeg")# plotMD(tmp_p_pbc_h.m, main = "Mean-difference plot, PBC vs. Healthy and MASLD, Plasma") 
-# dev.off()
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/MD-plot_pbc_vs_healthy_and_masld_plasma.jpeg")# plotMD(tmp_p_pbc_h.m, main = "Mean-difference plot, PBC vs. Healthy and MASLD, Plasma") 
+dev.off()
 
 # Extract results
 top.table.p.pbc.h.m <- topTable(tmp_p_pbc_h.m, coef = 1, sort.by = "P", n = Inf) 
@@ -1626,8 +1494,8 @@ volcano_plot_p_pbc_h.m
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/volcano_plasma_pbc_healthy_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_h.m, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/volcano_plasma_pbc_healthy_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_p_pbc_h.m, device = "jpeg")
 
 # Number of upregulated proteins in PBC vs Healthy and MASLD:
 
@@ -1663,8 +1531,15 @@ down_plasma_pbc_vs_h.m <-
   sorted_downregulated_proteins_p_pbc_h.m[, c("GeneName.UniprotID","GeneName","UniProtID", "log2FC", "adj.P.Val")]
 
 
-
 ################## PBC vs Healthy and MASLD - without outliers ##################
+
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Check the new group counts
 table(p_no_outliers$group_1)
@@ -1718,27 +1593,27 @@ tmp_p_pbc_h.m_no_outliers
 # Scatterplot of residual-variances vs average log-expression
 # save plot
 
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/plotSA_pbc_vs_healthy_and_masld_without_outliers_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/plotSA_pbc_vs_healthy_and_masld_without_outliers_plasma.jpeg")
 
 plotSA(
   tmp_p_pbc_h.m_no_outliers,
   main = "Residual variances vs. average log-expression, PBC vs. Healthy and MASLD without outliers, Plasma"
 )
 
-#dev.off()
+dev.off()
 
 
 # Mean Difference plot. Log-intensity ratios versus log-intensity averages
 # save plot
 
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/MD-plot_pbc_vs_healthy_and_masld_without_outliers_plasma.jpeg")
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/MD-plot_pbc_vs_healthy_and_masld_without_outliers_plasma.jpeg")
 
 plotMD(
   tmp_p_pbc_h.m_no_outliers,
   main = "Mean-difference plot, PBC vs. Healthy and MASLD without outliers, Plasma"
 )
 
-# dev.off()
+dev.off()
 # Extract results
 
 top.table.p.pbc.h.m_no_outliers <- topTable(
@@ -1825,8 +1700,8 @@ volcano_plot_p_pbc_h.m_no_outliers
 
 
 # Save plot
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/volcano_plasma_pbc_healthy_masld_without_outliers_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/volcano_plasma_pbc_healthy_masld_without_outliers_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_outliers, device = "jpeg")
 
 
 # Number of upregulated proteins in PBC vs Healthy and MASLD without outliers: #38
@@ -1900,6 +1775,13 @@ down_plasma_pbc_vs_h.m_no_outliers <-
 
 #### PBC vs. Healthy and MASLD, no cirrhosis
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 table(p_no_c$group_1)
 
 p_pbc_h.m_no_c <- subset(p_no_c, group_1 %in% c("PBC","Control"))
@@ -1964,8 +1846,8 @@ volcano_plot_p_pbc_h.m_no_c
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/volcano_plasma_pbc_healthy_masld_fdr0.05_no_c.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/volcano_plasma_pbc_healthy_masld_fdr0.05_no_c.jpeg",
+       width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_c, device = "jpeg")
 
 # Number of upregulated proteins in PBC no cirrhosis:
 
@@ -2003,9 +1885,14 @@ down_plasma_pbc_vs_h.m_no_c <-
 
 
 
+################## PBC vs Healthy and MASLD - without MASLD in PBC ##################
 
-
-####### PBC without MASLD vs Healthy and MASLD ################
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 table(p_no_masld$group_1)
 
@@ -2070,8 +1957,8 @@ volcano_plot_p_pbc_h.m_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/volcano_plasma_pbc_h.m_no_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/volcano_plasma_pbc_h.m_no_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_p_pbc_h.m_no_masld, device = "jpeg")
 
 # Number of upregulated proteins in PBC no MASLD:
 
@@ -2113,6 +2000,13 @@ down_plasma_pbc_vs_h.m_no_masld <-
 ###### PCA ######
 
 #### from http://www.sthda.com/english/articles/22-principal-component-methods-videos/65-pca-in-r-using-factominer-quick-scripts-and-videos/ ###
+
+# Create output directory
+dir.create(
+  "../output/PCA",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # import baseline characteristics from "merged" document created with "pbc_baseline_characteristics.R"
 
@@ -2195,7 +2089,7 @@ eig.val.t <- res.pca.t$eig
 # Visualize the graph of individuals. Individuals with a similar profile are grouped together.
 
 # By diagnosis
-# jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_masld_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t, 
              geom.ind = "point", # default is point + text and text is 1:n samples
@@ -2213,37 +2107,6 @@ fviz_pca_ind(res.pca.t,
     axis.title = element_text(size = 16),   # Increase x- and y-axis title size
     plot.title = element_text(size = 18),   # Increase plot title size
     legend.position = "bottom"              # Move legend to the bottom
-  )
-
-# dev.off()
-
-# save PCA plot with sample IDs
-# jpeg(file = "../output/PCA/pca_liver_diagnosis_with_IDs.jpeg",
-#      width = 3000, height = 2500, res = 300)
-
-fviz_pca_ind(
-  res.pca.t,
-  geom.ind = "point",
-  col.ind = pca_t$group,
-  palette = c("#58aadb", "grey", "#AA0233"),
-  pointsize = 3,
-  pointshape = 19,
-  invisible = "quali",
-  legend.title = "Diagnosis"
-) +
-  geom_text_repel(
-    aes(label = pca_t$subject),
-    size = 3,
-    max.overlaps = Inf
-  ) +
-  ggtitle("Individuals - PCA liver with sample IDs") +
-  theme(
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18),
-    legend.position = "bottom"
   )
 
 dev.off()
@@ -2286,40 +2149,9 @@ pca_3d_plot_t
 
 
 # save plot
-# htmlwidgets::saveWidget(pca_3d_plot_t, "../output/PCA/pca_3d_liver_diagnosis.html",
-#                         selfcontained = TRUE)
+htmlwidgets::saveWidget(pca_3d_plot_t, "../output/PCA/pca_3d_liver_diagnosis.html",
+                       selfcontained = TRUE)
 
-
-###### 3D PCA without subject IDs ######
-
-pca_3d_plot_t_no_ids <- plot_ly(
-  data = pca_3d_t,
-  x = ~Dim.1,
-  y = ~Dim.2,
-  z = ~Dim.3,
-  color = ~group,
-  colors = c("#58aadb", "grey", "#AA0233"),
-  text = ~paste("Group:", group),
-  hoverinfo = "text",
-  type = "scatter3d",
-  mode = "markers",
-  marker = list(size = 5)
-) %>%
-  layout(
-    title = "3D PCA liver",
-    scene = list(
-      xaxis = list(title = paste0("PC1 (", round(eig.val.t[1, 2], 1), "%)")),
-      yaxis = list(title = paste0("PC2 (", round(eig.val.t[2, 2], 1), "%)")),
-      zaxis = list(title = paste0("PC3 (", round(eig.val.t[3, 2], 1), "%)"))
-    ),
-    legend = list(title = list(text = "Diagnosis"))
-  )
-
-pca_3d_plot_t_no_ids
-
-# save plot
-# htmlwidgets::saveWidget(pca_3d_plot_t_no_ids, "../output/PCA/pca_3d_liver_diagnosis_no_IDs.html",
-#                         selfcontained = TRUE)
 
 
 # Extract PCA coordinates (first 5 PCs)
@@ -2345,82 +2177,12 @@ outliers_t <- pca_coord_t[pca_coord_t$Mahalanobis > threshold_t, ]
 # View potential outliers # FALL_75, PLS_49, PLS_51
 outliers_t
 
-#Dim.1     Dim.2      Dim.3     Dim.4      Dim.5 Mahalanobis subject
-#27   4.871669 104.76611 -33.916941 -3.748867  32.953226    17.72373 FALL_75
-#37 225.579974  24.97052   6.193744 40.638660 -24.713131    31.85935  PLS_49
-#38  -5.873517  32.39725 106.379378 -2.483169   8.207143    22.57845  PLS_51
-
 # Define liver outliers
 liver_outlier_ids <- c("FALL_75", "PLS_49", "PLS_51")
 
 
-###### PCA without outliers ######
-
-# Remove outliers
-pca_t_no_outliers <- pca_t %>%
-  filter(!subject %in% liver_outlier_ids)
-
-# Check dimensions
-dim(pca_t)
-dim(pca_t_no_outliers)
-
-# Check that outliers are removed
-subset(pca_t_no_outliers, subject %in% liver_outlier_ids)
-
-
-# Now to PCA
-res.pca.t.no_outliers <- PCA(
-  pca_t_no_outliers,
-  graph = FALSE,
-  quali.sup = c("subject", "sex", "cirrose", "con_masld",
-                "group", "group_1", "pbc_antibody", "group_urso"),
-  quanti.sup = c("bmi", "age")
-)
-
-eig.val.t.no_outliers <- res.pca.t.no_outliers$eig
-
-# n.pc.t.no_outliers <- min(10, nrow(eig.val.t.no_outliers))
-
-#barplot(
-#  eig.val.t.no_outliers[1:n.pc.t.no_outliers, 2],
-#  names.arg = 1:n.pc.t.no_outliers,
-#  main = "Variances Explained by PCs (%)",
-#  xlab = "Principal Components",
-#  ylab = "Percentage of variance",
-#  col = "steelblue"
-#)
-
-# Visualize the graph of individuals. Individuals with a similar profile are grouped together.
-
-# By diagnosis
-
-fviz_pca_ind(
-  res.pca.t.no_outliers,
-  geom.ind = "point",
-  col.ind = pca_t_no_outliers$group,
-  palette = c("#58aadb","grey","#AA0233"),
-  pointsize = 3,
-  pointshape = 19,
-  invisible = "quali",
-  legend.title = "Diagnosis"
-) +
-  ggtitle("Individuals - PCA liver without outliers") +
-  theme(
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18),
-    legend.position = "bottom"
-  )
-
-# Save plot
-
-# ggsave("../output/PCA/pca_liver_diagnosis_without_outliers.jpeg",
-#         width = 10, height = 8, device = "jpeg")
-
 # By diagnosis and concurrent MASLD
-# jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_con.masld_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_con.masld_masld_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t, 
              geom.ind = "point", # default is point + text and text is 1:n samples
@@ -2432,10 +2194,10 @@ fviz_pca_ind(res.pca.t,
              legend.title = "Diagnosis") + 
   ggtitle("Individuals - PCA liver")
 
-# dev.off()
+dev.off()
 
 # By sex
-# jpeg(file = "../output/PCA/pca_liver_sex_pbc_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_sex_pbc_masld_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t, 
              geom.ind = "point", # default er c("point","text")
@@ -2446,10 +2208,10 @@ fviz_pca_ind(res.pca.t,
              legend.title = "Sex") + 
   ggtitle("Individuals - PCA liver")
 
-# dev.off()
+dev.off()
 
 # By cirrhosis
-# jpeg(file = "../output/PCA/pca_liver_cirrhosis_pbc_masld_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_cirrhosis_pbc_masld_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t, 
              geom.ind = "point", # default er c("point","text")
@@ -2468,7 +2230,7 @@ fviz_pca_ind(res.pca.t,
     legend.position = "bottom"              # Move legend to the bottom
   )
 
-# dev.off()
+dev.off()
 
 # Cirrhosis cluster together
 
@@ -2498,7 +2260,7 @@ eig.val.t.pbc <- res.pca.t.pbc$eig
 # Visualize the graph of individuals. Individuals with a similar profile are grouped together.
 
 # By diagnosis
-# jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_diagnosis_pbc_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t.pbc, 
              geom.ind = "point", # default is point + text and text is 1:n samples
@@ -2510,10 +2272,10 @@ fviz_pca_ind(res.pca.t.pbc,
              legend.title = "Diagnosis") +
   ggtitle("Individuals - PCA liver")
 
-# dev.off()
+dev.off()
 
 # By sex
-# jpeg(file = "../output/PCA/pca_liver_sex_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_sex_pbc_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t.pbc, 
              geom.ind = "point", # default er c("point","text") 
@@ -2524,10 +2286,10 @@ fviz_pca_ind(res.pca.t.pbc,
              legend.title = "Sex") +
   ggtitle("Individuals - PCA liver")
 
-# dev.off()
+dev.off()
 
 # By cirrhosis
-# jpeg(file = "../output/PCA/pca_liver_cirrhosis_pbc_healthy.jpeg")
+jpeg(file = "../output/PCA/pca_liver_cirrhosis_pbc_healthy.jpeg")
 
 fviz_pca_ind(res.pca.t.pbc, 
              geom.ind = "point", # default er c("point","text") 
@@ -2538,7 +2300,7 @@ fviz_pca_ind(res.pca.t.pbc,
              legend.title = "Cirrhosis") +
   ggtitle("Individuals - PCA liver")
 
-# dev.off()
+dev.off()
 
 # Cirrhosis cluster together
 
@@ -2613,6 +2375,13 @@ dim(t_no_masld)
 
 # Differential expression PBC vs Healthy 
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 t_pbc <- subset(t, group %in% c("PBC","Healthy"))
 levels(t_pbc$group)
 table(t_pbc$group)
@@ -2657,15 +2426,15 @@ tmp_t_pbc <- eBayes(tmp_t_pbc)
 
 # Scatterplot of residual-variances vs average log-expression
 # Save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/plotSA_pbc_vs_healthy_liver.jpeg")
-# plotSA(tmp_t_pbc, main = "Residual variances vs average log-expression, PBC vs. Healthy, Liver") 
-# dev.off()
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/plotSA_pbc_vs_healthy_liver.jpeg")
+plotSA(tmp_t_pbc, main = "Residual variances vs average log-expression, PBC vs. Healthy, Liver") 
+ dev.off()
 
 # Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
 # Save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/MD-plot_pbc_vs_healthy_liver.jpeg")
-# plotMD(tmp_t_pbc, main = "Mean-difference plot, PBC vs. Healthy, Liver") 
-# dev.off()
+jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/All/MD-plot_pbc_vs_healthy_liver.jpeg")
+plotMD(tmp_t_pbc, main = "Mean-difference plot, PBC vs. Healthy, Liver") 
+dev.off()
 
 # Extract results
 top.table.t.pbc <- topTable(tmp_t_pbc, coef = 1, sort.by = "P", n = Inf) #default is "BH" which is alias of "fdr"
@@ -2721,8 +2490,8 @@ volcano_plot_t_pbc
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/volcano_liver_pbc_healthy_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/volcano_liver_pbc_healthy_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -2761,6 +2530,13 @@ down_liver_pbc_vs_healthy <-
 
 
 ################## Differential expression PBC vs Healthy - without outliers ##################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 t_pbc_no_outliers <- subset(t_no_outliers, group %in% c("PBC","Healthy"))
 
@@ -2831,34 +2607,6 @@ tmp_t_pbc_no_outliers <- contrasts.fit(
 tmp_t_pbc_no_outliers <- eBayes(tmp_t_pbc_no_outliers)
 
 tmp_t_pbc_no_outliers
-
-
-### Diagnostic plots:
-
-# Scatterplot of residual-variances vs average log-expression
-# Save plot
-
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/plotSA_pbc_vs_healthy_without_outliers_liver.jpeg")
-
-#plotSA(
-#  tmp_t_pbc_no_outliers,
-#  main = "Residual variances vs average log-expression, PBC vs. Healthy without outliers, Liver"
-#)
-
-#dev.off()
-
-
-# Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
-# Save plot
-
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/MD-plot_pbc_vs_healthy_without_outliers_liver.jpeg")
-
-#plotMD(
-#  tmp_t_pbc_no_outliers,
-#  main = "Mean-difference plot, PBC vs. Healthy without outliers, Liver"
-#)
-
-#dev.off()
 
 
 # Extract results
@@ -2969,8 +2717,8 @@ volcano_plot_t_pbc_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/volcano_liver_pbc_healthy_without_outliers_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/volcano_liver_pbc_healthy_without_outliers_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_no_outliers, device = "jpeg")
 
 
 # Number of upregulated proteins in PBC without outliers: #1216
@@ -3041,9 +2789,14 @@ down_liver_pbc_vs_healthy_no_outliers <-
                                                   c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
 
 
-
-
 ###### PBC vs. Healthy, no cirrhosis
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 table(t_no_c$group)
 
@@ -3084,19 +2837,6 @@ tmp_t_pbc_no_c <- eBayes(tmp_t_pbc_no_c)
 # could also set robust = T and trend = T in eBayes (gives somewhat same result). 
 # Check: https://support.bioconductor.org/p/56560/
 
-### Diagnostic plots:
-# Scatterplot of residual-variances vs average log-expression
-# save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/plotSA_pbc_vs_healthy_liver_no.cirrhosis.jpeg")
-
-# plotSA(tmp_t_pbc_no_c, main = "Residual variances vs average log-expression, non-cirrhotic PBC vs. Healthy, Liver") 
-# dev.off()
-
-# Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
-# save plot
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/MD-plot_pbc_vs_healthy_liver_no.cirrhosis.jpeg")
-# plotMD(tmp_t_pbc_no_c, main = "Mean-difference plot, non-cirrhotic PBC vs. Healthy, Liver") 
-# dev.off()
 
 # Extract results
 top.table.t.pbc.no.c <- topTable(tmp_t_pbc_no_c, coef = 1, sort.by = "P", n = Inf) #default is "BH" which is alias of "fdr"
@@ -3114,12 +2854,89 @@ results.t.pbc.no.c[1:20,6:10]
 results.t.pbc.no.c$log2FC <- results.t.pbc.no.c$logFC
 results.t.pbc.no.c[1:3,c(1,8:11)]
 
+#### volcano PBC vs. healthy tissue - no cirrhosis  
+
+# Identify proteins that meet the filtering criteria
+
+selected_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
+  filter(adj.P.Val < 0.05)
+
+# As volcano plot cannot print all the names and becomes impossible to view, I filter only those proteins
+# that are regulated more than 1 or less than -1
+selected_proteins_t_pbc_volcano_no_c <- results.t.pbc.no.c %>%
+  filter(logFC >= 1 & adj.P.Val < 0.05 | logFC <= -1 & adj.P.Val < 0.05)
+
+volcano_plot_t_pbc_no_c <- ggplot(results.t.pbc.no.c) +
+  geom_point(aes(x = logFC, y = -log10(adj.P.Val),
+                 color = ifelse(logFC <= -0.0001 & adj.P.Val < 0.05, 'blue', 
+                                ifelse(logFC >= 0.0001 & adj.P.Val < 0.05, 'red', 'grey')))) +
+  geom_text(data = selected_proteins_t_pbc_volcano_no_c,
+            aes(x = logFC, 
+                y = -log10(adj.P.Val), 
+                label = GeneName),
+            size = 3, hjust = 0, vjust = 0) +
+  scale_color_identity() +
+  labs(x = "log2(FC)", y = "-log10(adj P value)") +
+  ggtitle("Differential Liver Protein Expression, non-cirrhotic PBC vs. Healthy")+
+  annotate("segment", x = -Inf, xend = Inf, y = -log10(0.05), yend = -log10(0.05),
+           linetype = "dashed", color = "gray") +  # Add horizontal line
+  theme(
+    axis.title = element_text(size = 20),  # Increase axis title size
+    axis.text = element_text(size = 18),   # Increase axis text (tick labels) size
+    plot.title = element_text(size = 20)   # Increase plot title size
+  )
+
+volcano_plot_t_pbc_no_c
+
+# Save plot
+
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/volcano_liver_pbc_healthy_fdr0.05_no.cirrhosis.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_no_c, device = "jpeg")
+
+# Number of upregulated proteins in PBC:
+
+selected_upregulated_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
+  filter((logFC >= 0.0001 & adj.P.Val < 0.05))
+nrow(selected_upregulated_proteins_t_pbc_no_c) # 1039
+
+# Number of downregulated proteins in PBC:
+selected_downregulated_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
+  filter(logFC <= -0.0001 & adj.P.Val < 0.05)
+nrow(selected_downregulated_proteins_t_pbc_no_c) # 1272
+
+# Sort the upregulated proteins by adjusted p-value
+sorted_upregulated_proteins_t_pbc_no_c <- 
+  arrange(subset(results.t.pbc.no.c, logFC >= 0.0001 & adj.P.Val < 0.05), adj.P.Val)
+
+# Display the sorted list of upregulated proteins with gene names
+print(sorted_upregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")])
+
+# Create a data frame with the desired output
+up_liver_pbc_vs_healthy_no_c <- 
+  sorted_upregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
+
+# Sort the downregulated proteins by adjusted p-value
+sorted_downregulated_proteins_t_pbc_no_c <- 
+  arrange(subset(results.t.pbc.no.c, logFC <= -0.0001 & adj.P.Val < 0.05), adj.P.Val)
+
+# Display the sorted list of downregulated proteins with gene names
+print(sorted_downregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")])
+
+# Create a data frame with the desired output
+down_liver_pbc_vs_healthy_no_c <- 
+  sorted_downregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
 
 
 
 
 ########### Differential expression PBC vs MASLD ###################
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_MASLD/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 t_pbc_masld <- subset(t, group %in% c("PBC","NAFLD"))
 levels(t_pbc_masld$group)
@@ -3200,8 +3017,8 @@ volcano_plot_t_pbc_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/volcano_liver_pbc_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/volcano_liver_pbc_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_masld, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -3236,13 +3053,21 @@ down_liver_pbc_vs_masld <-
   sorted_downregulated_proteins_t_pbc_masld[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
 
 
-# write.xlsx(list("downreg_plasma_pbc_vs_masld" = down_plasma_pbc_vs_masld,
-#                 "upreg_plasma_pbc_vs_masld" = up_plasma_pbc_vs_masld,
-#                 "downreg_liver_pbc_vs_masld" = down_liver_pbc_vs_masld,
-#                 "upreg_liver_pbc_vs_masld" = up_liver_pbc_vs_masld),
-#            "../output/FDR0.05_all/PBC_vs_MASLD/All/DE_proteins_fdr0.05_pbc_vs_masld.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_masld" = down_plasma_pbc_vs_masld,
+               "upreg_plasma_pbc_vs_masld" = up_plasma_pbc_vs_masld,
+               "downreg_liver_pbc_vs_masld" = down_liver_pbc_vs_masld,
+               "upreg_liver_pbc_vs_masld" = up_liver_pbc_vs_masld),
+          "../output/FDR0.05_all/PBC_vs_MASLD/All/DE_proteins_fdr0.05_pbc_vs_masld.xlsx")
+
 
 ###### PBC vs. MASLD, no cirrhosis
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 table(t_no_c$group)
 
@@ -3317,8 +3142,8 @@ volcano_plot_t_pbc_masld_no_c
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/volcano_liver_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_masld_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/volcano_liver_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_masld_no_c, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -3354,13 +3179,20 @@ print(sorted_downregulated_proteins_t_pbc_masld_no_c[, c("GeneName.UniprotID","G
 down_liver_pbc_vs_masld_no_c <- 
   sorted_downregulated_proteins_t_pbc_masld_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
 
-# write.xlsx(list("down_plasma_pbc_masld_no_c" = down_plasma_pbc_vs_masld_no_c,
-#                 "up_plasma_pbc_masld_no_c" = up_plasma_pbc_vs_masld_no_c,
-#                 "down_liver_pbc_masld_no_c" = down_liver_pbc_vs_masld_no_c,
-#                 "up_liver_pbc_masld_no_c" = up_liver_pbc_vs_masld_no_c),
-#            "../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_masld_no_c.xlsx")
+write.xlsx(list("down_plasma_pbc_masld_no_c" = down_plasma_pbc_vs_masld_no_c,
+               "up_plasma_pbc_masld_no_c" = up_plasma_pbc_vs_masld_no_c,
+               "down_liver_pbc_masld_no_c" = down_liver_pbc_vs_masld_no_c,
+               "up_liver_pbc_masld_no_c" = up_liver_pbc_vs_masld_no_c),
+          "../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_masld_no_c.xlsx")
 
 ###### PBC without MASLD vs. Healthy
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 table(t_no_masld$group)
 
@@ -3432,83 +3264,6 @@ results.t.pbc.no.masld[1:3,c(1,8:11)]
 
 
 
-
-#### volcano PBC vs. healthy tissue - no cirrhosis  
-
-# Identify proteins that meet the filtering criteria
-
-selected_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
-  filter(adj.P.Val < 0.05)
-
-# As volcano plot cannot print all the names and becomes impossible to view, I filter only those proteins
-# that are regulated more than 1 or less than -1
-selected_proteins_t_pbc_volcano_no_c <- results.t.pbc.no.c %>%
-  filter(logFC >= 1 & adj.P.Val < 0.05 | logFC <= -1 & adj.P.Val < 0.05)
-
-volcano_plot_t_pbc_no_c <- ggplot(results.t.pbc.no.c) +
-  geom_point(aes(x = logFC, y = -log10(adj.P.Val),
-                 color = ifelse(logFC <= -0.0001 & adj.P.Val < 0.05, 'blue', 
-                                ifelse(logFC >= 0.0001 & adj.P.Val < 0.05, 'red', 'grey')))) +
-  geom_text(data = selected_proteins_t_pbc_volcano_no_c,
-            aes(x = logFC, 
-                y = -log10(adj.P.Val), 
-                label = GeneName),
-            size = 3, hjust = 0, vjust = 0) +
-  scale_color_identity() +
-  labs(x = "log2(FC)", y = "-log10(adj P value)") +
-  ggtitle("Differential Liver Protein Expression, non-cirrhotic PBC vs. Healthy")+
-  annotate("segment", x = -Inf, xend = Inf, y = -log10(0.05), yend = -log10(0.05),
-           linetype = "dashed", color = "gray") +  # Add horizontal line
-  theme(
-    axis.title = element_text(size = 20),  # Increase axis title size
-    axis.text = element_text(size = 18),   # Increase axis text (tick labels) size
-    plot.title = element_text(size = 20)   # Increase plot title size
-  )
-
-volcano_plot_t_pbc_no_c
-
-# Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/volcano_liver_pbc_healthy_fdr0.05_no.cirrhosis.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_no_c, device = "jpeg")
-
-# Number of upregulated proteins in PBC:
-
-selected_upregulated_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
-  filter((logFC >= 0.0001 & adj.P.Val < 0.05))
-nrow(selected_upregulated_proteins_t_pbc_no_c) # 1039
-
-# Number of downregulated proteins in PBC:
-selected_downregulated_proteins_t_pbc_no_c <- results.t.pbc.no.c %>%
-  filter(logFC <= -0.0001 & adj.P.Val < 0.05)
-nrow(selected_downregulated_proteins_t_pbc_no_c) # 1272
-
-# Sort the upregulated proteins by adjusted p-value
-sorted_upregulated_proteins_t_pbc_no_c <- 
-  arrange(subset(results.t.pbc.no.c, logFC >= 0.0001 & adj.P.Val < 0.05), adj.P.Val)
-
-# Display the sorted list of upregulated proteins with gene names
-print(sorted_upregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")])
-
-# Create a data frame with the desired output
-up_liver_pbc_vs_healthy_no_c <- 
-  sorted_upregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
-
-# Sort the downregulated proteins by adjusted p-value
-sorted_downregulated_proteins_t_pbc_no_c <- 
-  arrange(subset(results.t.pbc.no.c, logFC <= -0.0001 & adj.P.Val < 0.05), adj.P.Val)
-
-# Display the sorted list of downregulated proteins with gene names
-print(sorted_downregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")])
-
-# Create a data frame with the desired output
-down_liver_pbc_vs_healthy_no_c <- 
-  sorted_downregulated_proteins_t_pbc_no_c[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC", "adj.P.Val")]
-
-
-
-
-
 #### volcano PBC without MASLD vs. healthy liver
 
 # Identify proteins that meet the filtering criteria
@@ -3545,19 +3300,19 @@ volcano_plot_t_pbc_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/volcano_liver_pbc_healthy_fdr0.05_no.masld.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/volcano_liver_pbc_healthy_fdr0.05_no.masld.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_no_masld, device = "jpeg")
 
-# Number of upregulated proteins in PBC:
+# Number of upregulated proteins in PBC without MASLD vs healthy:
 
 selected_upregulated_proteins_t_pbc_no_masld <- results.t.pbc.no.masld %>%
   filter((logFC >= 0.0001 & adj.P.Val < 0.05))
-nrow(selected_upregulated_proteins_t_pbc_no_masld) # 1039
+nrow(selected_upregulated_proteins_t_pbc_no_masld) 
 
-# Number of downregulated proteins in PBC:
+# Number of downregulated proteins in PBC without MASLD vs healthy:
 selected_downregulated_proteins_t_pbc_no_masld <- results.t.pbc.no.masld %>%
   filter(logFC <= -0.0001 & adj.P.Val < 0.05)
-nrow(selected_downregulated_proteins_t_pbc_no_masld) # 1272
+nrow(selected_downregulated_proteins_t_pbc_no_masld) 
 
 # Sort the upregulated proteins by adjusted p-value
 sorted_upregulated_proteins_t_pbc_no_masld <- 
@@ -3589,6 +3344,13 @@ table(t$group_1)
 
 ### DE analysis of PBC compared with Healthy/MASLD
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 t_pbc_h.m <- subset(t, group_1 %in% c("PBC","Control"))
 
 table(t_pbc_h.m$group_1)
@@ -3612,17 +3374,6 @@ contr_t_pbc_h.m
 tmp_t_pbc_h.m <- contrasts.fit(fit_t_pbc_h.m, contr_t_pbc_h.m)
 tmp_t_pbc_h.m <- eBayes(tmp_t_pbc_h.m)
 tmp_t_pbc_h.m
-
-### Diagnostic plots:
-# Scatterplot of residual-variances vs average log-expression
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/plotSA_pbc_vs_healthy_and_masld_liver.jpeg")
-#plotSA(tmp_t_pbc_h.m, main = "Residual variances vs. average log-expression, PBC vs. Healthy and MASLD, Liver")
-# dev.off()
-
-# Mean Difference plot. Log-intensity ratios (differences, y) versus log-intensity averages (means, x):
-# jpeg(file = "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/MD-plot_pbc_vs_healthy_and_masld_liver.jpeg")
-#plotMD(tmp_t_pbc_h.m, main = "Mean-difference plot, PBC vs. Healthy and MASLD, Liver") 
-# dev.off()
 
 # Extract results
 top.table.t.pbc.h.m <- topTable(tmp_t_pbc_h.m, coef = 1, sort.by = "P", n = Inf) 
@@ -3671,8 +3422,8 @@ volcano_plot_t_pbc_h.m
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/volcano_liver_pbc_healthy_and_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_h.m, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/volcano_liver_pbc_healthy_and_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_h.m, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -3776,7 +3527,7 @@ down_plasma_pbc_vs_healthy_age_match <-
   sorted_downregulated_proteins_p_match_age[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")]
 
 
-################### plama sex only ###################
+################### plasma sex only ###################
 
 design_p_match_sex <- model.matrix(~ 0 + group + sex, p_match_single)
 design_p_match_sex[1:20,]
@@ -3816,7 +3567,7 @@ down_plasma_pbc_vs_healthy_sex_match <-
   sorted_downregulated_proteins_p_match_sex[, c("GeneName.UniprotID","GeneName", "UniProtID","log2FC", "adj.P.Val")]
 
 
-################### plama BMI only ###################
+################### plasma BMI only ###################
 
 design_p_match_bmi <- model.matrix(~ 0 + group + bmi, p_match_single)
 design_p_match_bmi[1:20,]
@@ -3909,7 +3660,7 @@ selected_downregulated_proteins_p_match_cirrhosis <- results.p.match.cirrhosis %
 nrow(selected_downregulated_proteins_p_match_cirrhosis)
 
 
-################### Age + sex matching PBC vs Healthy #########################################################
+################### Age + sex adjusted PBC vs Healthy #########################################################
 
 
 ### Plasma
@@ -4367,7 +4118,7 @@ down_liver_pbc_vs_healthy_cirrhosis_match <-
 
 
 
-################## Liver age + sex matching PBC vs healthy #####
+################## Liver age + sex adjusting PBC vs healthy #####
 
 dim(pca_t)
 pca_t[1:5, 1:10] 
@@ -4535,38 +4286,46 @@ data.frame(
 
 
 # ######################## Save in an excel file ##########
-# write.xlsx(list(
-#   "plasma_age_up" = up_plasma_pbc_vs_healthy_age_match, "plasma_age_down" = down_plasma_pbc_vs_healthy_age_match,
-#   "plasma_sex_up" = up_plasma_pbc_vs_healthy_sex_match, "plasma_sex_down" = down_plasma_pbc_vs_healthy_sex_match,
-#   "plasma_bmi_up" = up_plasma_pbc_vs_healthy_bmi_match, "plasma_bmi_down" = down_plasma_pbc_vs_healthy_bmi_match,
-#   "plasma_cirrhosis_up" = up_plasma_pbc_vs_healthy_cirrhosis_match, "plasma_cirrhosis_down" = down_plasma_pbc_vs_healthy_cirrhosis_match,
-#   "plasma_age_sex_up" = up_plasma_pbc_vs_healthy_match, "plasma_age_sex_down" = down_plasma_pbc_vs_healthy_match,
-#   "plasma_age_sex_nc_up" = up_plasma_pbc_vs_healthy_no_c_match, "plasma_age_sex_nc_down" = down_plasma_pbc_vs_healthy_no_c_match,
-#   "liver_age_up" = up_liver_pbc_vs_healthy_age_match, "liver_age_down" = down_liver_pbc_vs_healthy_age_match,
-#   "liver_sex_up" = up_liver_pbc_vs_healthy_sex_match, "liver_sex_down" = down_liver_pbc_vs_healthy_sex_match,
-#   "liver_bmi_up" = up_liver_pbc_vs_healthy_bmi_match, "liver_bmi_down" = down_liver_pbc_vs_healthy_bmi_match,
-#   "liver_cirrhosis_up" = up_liver_pbc_vs_healthy_cirrhosis_match, "liver_cirrhosis_down" = down_liver_pbc_vs_healthy_cirrhosis_match,
-#   "liver_age_sex_up" = up_liver_pbc_vs_healthy_match, "liver_age_sex_down" = down_liver_pbc_vs_healthy_match,
-#   "liver_age_sex_nc_up" = up_liver_pbc_vs_healthy_no_c_match, "liver_age_sex_nc_down" = down_liver_pbc_vs_healthy_no_c_match),
-#   "../output/FDR0.05_all/PBC_vs_Healthy/All/sensitivity_adjusted_DE_proteins_pbc_vs_healthy.xlsx")
+write.xlsx(list(
+ "plasma_age_up" = up_plasma_pbc_vs_healthy_age_match, "plasma_age_down" = down_plasma_pbc_vs_healthy_age_match,
+ "plasma_sex_up" = up_plasma_pbc_vs_healthy_sex_match, "plasma_sex_down" = down_plasma_pbc_vs_healthy_sex_match,
+ "plasma_bmi_up" = up_plasma_pbc_vs_healthy_bmi_match, "plasma_bmi_down" = down_plasma_pbc_vs_healthy_bmi_match,
+ "plasma_cirrhosis_up" = up_plasma_pbc_vs_healthy_cirrhosis_match, "plasma_cirrhosis_down" = down_plasma_pbc_vs_healthy_cirrhosis_match,
+ "plasma_age_sex_up" = up_plasma_pbc_vs_healthy_match, "plasma_age_sex_down" = down_plasma_pbc_vs_healthy_match,
+ "plasma_age_sex_nc_up" = up_plasma_pbc_vs_healthy_no_c_match, "plasma_age_sex_nc_down" = down_plasma_pbc_vs_healthy_no_c_match,
+ "liver_age_up" = up_liver_pbc_vs_healthy_age_match, "liver_age_down" = down_liver_pbc_vs_healthy_age_match,
+ "liver_sex_up" = up_liver_pbc_vs_healthy_sex_match, "liver_sex_down" = down_liver_pbc_vs_healthy_sex_match,
+ "liver_bmi_up" = up_liver_pbc_vs_healthy_bmi_match, "liver_bmi_down" = down_liver_pbc_vs_healthy_bmi_match,
+ "liver_cirrhosis_up" = up_liver_pbc_vs_healthy_cirrhosis_match, "liver_cirrhosis_down" = down_liver_pbc_vs_healthy_cirrhosis_match,
+ "liver_age_sex_up" = up_liver_pbc_vs_healthy_match, "liver_age_sex_down" = down_liver_pbc_vs_healthy_match,
+ "liver_age_sex_nc_up" = up_liver_pbc_vs_healthy_no_c_match, "liver_age_sex_nc_down" = down_liver_pbc_vs_healthy_no_c_match),
+ "../output/FDR0.05_all/PBC_vs_Healthy/All/sensitivity_adjusted_DE_proteins_pbc_vs_healthy.xlsx")
 
 
 ######################## Save in an excel file age + sex matching #####################################
 
-# write.xlsx(list("down_plasma_pbc_healthy" = down_plasma_pbc_vs_healthy_match,
-#                 "up_plasma_pbc_healthy" = up_plasma_pbc_vs_healthy_match,
-#                 "down_liver_pbc_healthy" = down_liver_pbc_vs_healthy_match,
-#                 "up_liver_pbc_healthy" = up_liver_pbc_vs_healthy_match),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/All/age_sex_corr_DE_proteins_fdr0.05_pbc_vs_healthy.xlsx")
+write.xlsx(list("down_plasma_pbc_healthy" = down_plasma_pbc_vs_healthy_match,
+                 "up_plasma_pbc_healthy" = up_plasma_pbc_vs_healthy_match,
+                 "down_liver_pbc_healthy" = down_liver_pbc_vs_healthy_match,
+                 "up_liver_pbc_healthy" = up_liver_pbc_vs_healthy_match),
+            "../output/FDR0.05_all/PBC_vs_Healthy/All/age_sex_corr_DE_proteins_fdr0.05_pbc_vs_healthy.xlsx")
 
-# write.xlsx(list("down_plasma_pbc_h_no_c" = down_plasma_pbc_vs_healthy_no_c_match,
-#                 "up_plasma_pbc_h_no_c" = up_plasma_pbc_vs_healthy_no_c_match,
-#                 "down_liver_pbc_h_no_c" = down_liver_pbc_vs_healthy_no_c_match,
-#                 "up_liver_pbc_h_no_c" = up_liver_pbc_vs_healthy_no_c_match),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/age_sex_corr_DE_proteins_fdr0.05_pbc_vs_healthy_no.cirrhosis.xlsx")
+write.xlsx(list("down_plasma_pbc_h_no_c" = down_plasma_pbc_vs_healthy_no_c_match,
+               "up_plasma_pbc_h_no_c" = up_plasma_pbc_vs_healthy_no_c_match,
+               "down_liver_pbc_h_no_c" = down_liver_pbc_vs_healthy_no_c_match,
+                 "up_liver_pbc_h_no_c" = up_liver_pbc_vs_healthy_no_c_match),
+          "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/age_sex_corr_DE_proteins_fdr0.05_pbc_vs_healthy_no.cirrhosis.xlsx")
 
 
 ########## PBC vs Healthy and MASLD - without outliers
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 
 # Check the new group counts
 table(t_no_outliers$group_1)
@@ -4758,8 +4517,8 @@ volcano_plot_t_pbc_h.m_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/volcano_liver_pbc_healthy_and_masld_without_outliers_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/volcano_liver_pbc_healthy_and_masld_without_outliers_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_outliers, device = "jpeg")
 
 
 # Number of upregulated proteins in PBC: #357 
@@ -4838,6 +4597,13 @@ down_liver_pbc_vs_h.m_no_outliers <-
 
 #### PBC vs. Healthy and MASLD, no cirrhosis
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 table(t_no_c$group_1)
 
 t_pbc_h.m_no_c <- subset(t_no_c, group_1 %in% c("PBC","Control"))
@@ -4909,8 +4675,8 @@ volcano_plot_t_pbc_h.m_no_c
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/volcano_liver_pbc_healthy_and_MASLD_no_cirrhosis_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/volcano_liver_pbc_healthy_and_MASLD_no_cirrhosis_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_c, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -4947,9 +4713,16 @@ down_liver_pbc_vs_h.m_no_c <-
 
 
 
-
-
 #### PBC without MASLD vs. Healthy and MASLD
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+table(t_no_masld$group_1)
 
 table(t_no_masld$group_1)
 
@@ -5022,8 +4795,8 @@ volcano_plot_t_pbc_h.m_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/volcano_liver_pbc_h.m_no_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/volcano_liver_pbc_h.m_no_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = volcano_plot_t_pbc_h.m_no_masld, device = "jpeg")
 
 # Number of upregulated proteins in PBC:
 
@@ -5063,6 +4836,12 @@ down_liver_pbc_vs_h.m_no_masld <-
 
 ##################### Paired liver and plasma ###########################################
 
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
 # Combine Results on GeneTables with Subject IDs, excluding proteins not present in both datasets
 combined_results <- merge(results.p.pbc, results.t.pbc,
                           by = c("protein", "GeneName", "UniProtID", "GeneName.UniprotID"),
@@ -5101,8 +4880,8 @@ correlation_liver_plasma_pbc_healthy
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_fc_liver_plasma_pbc_healthy.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_fc_liver_plasma_pbc_healthy.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy, device = "jpeg")
 
 # only for significant proteins:
 
@@ -5136,8 +4915,8 @@ correlation_sign_liver_plasma_pbc_healthy
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy, device = "jpeg")
 
 # Correlation analysis
 correlation_df_sign <- cor.test(combined_results_sign$log2FC_plasma, 
@@ -5164,8 +4943,8 @@ correlation_sign_log2fc_liver_plasma_pbc_healthy <- ggplot(combined_results_sign
 correlation_sign_log2fc_liver_plasma_pbc_healthy
 
 # save plot
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy, device = "jpeg")
 
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
@@ -5219,8 +4998,8 @@ correlation_sign_log2fc_liver_plasma_pbc_healthy_dots <-
 
 correlation_sign_log2fc_liver_plasma_pbc_healthy_dots
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
 
 # Identify Commonly Regulated Proteins
 common_upregulated <- combined_results_sign %>% filter(log2FC_plasma >= 0 & log2FC_liver >= 0)
@@ -5251,21 +5030,28 @@ common_down.liver_up.plasma_pbc_vs_healthy <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy,
-#                 "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy,
-#                 "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy,
-#                 "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy,
-#                 "up_liver_and_plasma_pbc" = common_up_pbc_vs_healthy,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/All/DE_proteins_fdr0.05_pbc_vs_healthy.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy,
+               "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy,
+               "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy,
+               "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy,
+               "up_liver_and_plasma_pbc" = common_up_pbc_vs_healthy,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy),
+          "../output/FDR0.05_all/PBC_vs_Healthy/All/DE_proteins_fdr0.05_pbc_vs_healthy.xlsx")
 
 
 
 
 
 ##################### Paired liver and plasma - without outliers ###########################################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results on GeneTables with Subject IDs, excluding proteins not present in both datasets
 combined_results_no_outliers <- merge(
@@ -5331,8 +5117,8 @@ correlation_liver_plasma_pbc_healthy_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_fc_liver_plasma_pbc_healthy_without_outliers.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_fc_liver_plasma_pbc_healthy_without_outliers.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
 
 
 # only for significant proteins:
@@ -5381,8 +5167,8 @@ correlation_sign_liver_plasma_pbc_healthy_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_without_outliers_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_without_outliers_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
 
 
 # log2fc scatterplot 
@@ -5407,8 +5193,8 @@ correlation_sign_log2fc_liver_plasma_pbc_healthy_no_outliers
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_without_outliers_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_without_outliers_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_no_outliers, device = "jpeg")
 
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
@@ -5468,8 +5254,8 @@ correlation_sign_log2fc_liver_plasma_pbc_healthy_dots_no_outliers <-
 correlation_sign_log2fc_liver_plasma_pbc_healthy_dots_no_outliers
 
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_dots_without_outliers_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_dots_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/scatter_correlation_log2fc_sign_liver_plasma_pbc_healthy_dots_without_outliers_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_log2fc_liver_plasma_pbc_healthy_dots_no_outliers, device = "jpeg")
 
 
 # Identify Commonly Regulated Proteins
@@ -5544,21 +5330,28 @@ common_down.liver_up.plasma_pbc_vs_healthy_no_outliers <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list(
-#   "downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_outliers,
-#   "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_outliers,
-#   "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_outliers,
-#   "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_outliers,
-#   "up_liver_and_plasma_pbc" = common_up_pbc_vs_healthy_no_outliers,
-#   "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_outliers,
-#   "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_outliers,
-#   "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_outliers),
-#   "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/DE_proteins_fdr0.05_pbc_vs_healthy_without_outliers.xlsx")
+write.xlsx(list(
+ "downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_outliers,
+ "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_outliers,
+ "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_outliers,
+ "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_outliers,
+ "up_liver_and_plasma_pbc" = common_up_pbc_vs_healthy_no_outliers,
+ "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_outliers,
+ "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_outliers,
+ "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_outliers),
+ "../output/FDR0.05_all/PBC_vs_Healthy/Without outliers/DE_proteins_fdr0.05_pbc_vs_healthy_without_outliers.xlsx")
 
 
 
 
 ##################### Paired liver and plasma without cirrhosis #######################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_no_c <- merge(results.p.pbc.no.c, results.t.pbc.no.c,
@@ -5600,10 +5393,10 @@ correlation_liver_plasma_pbc_healthy_no_c
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_fc_liver_plasma_pbc_healthy_no_cirrhosis.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_c, device = "jpeg")
-# only for significant proteins:
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_fc_liver_plasma_pbc_healthy_no_cirrhosis.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_c, device = "jpeg")
 
+# only for significant proteins:
 combined_results_sign_no_c <- combined_results_no_c %>% filter(adj.P.Val_plasma < 0.05 & adj.P.Val_liver < 0.05)
 
 nrow(combined_results_sign_no_c) # 26 proteins significantly regulated in both liver and plasma
@@ -5631,8 +5424,8 @@ correlation_sign_liver_plasma_pbc_healthy_no_c <- ggplot(combined_results_sign_n
 correlation_sign_liver_plasma_pbc_healthy_no_c
 
 # Save plot
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_no_cirrhosis.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_healthy_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_no_cirrhosis.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_healthy_no_c, device = "jpeg")
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
 ## Create a new column in your dataframe for colouring of only the dots
@@ -5685,8 +5478,8 @@ correlation_sign_no_c_log2fc_liver_plasma_pbc_healthy_dots <-
 
 correlation_sign_no_c_log2fc_liver_plasma_pbc_healthy_dots
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_log2fc_sign_no_cirrhosis_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_no_c_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/scatter_correlation_log2fc_sign_no_cirrhosis_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_no_c_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
  
 # Identify Commonly Regulated Proteins
 common_upregulated_no_c <- combined_results_sign_no_c %>% filter(log2FC_plasma >= 0 & log2FC_liver >= 0)
@@ -5717,17 +5510,24 @@ common_down.liver_up.plasma_pbc_vs_healthy_no_c <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_c,
-#                 "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_c,
-#                 "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_c,
-#                 "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_c,
-#                 "up_liver_and_plasma_pbc_no" = common_up_pbc_vs_healthy_no_c,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_c,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_c,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_c),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_healthy_no.cirrhosis.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_c,
+               "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_c,
+               "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_c,
+               "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_c,
+               "up_liver_and_plasma_pbc_no" = common_up_pbc_vs_healthy_no_c,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_c,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_c,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_c),
+          "../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_healthy_no.cirrhosis.xlsx")
 
 ##################### Paired liver and plasma without MASLD in PBC group #######################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_no_masld <- merge(results.p.pbc.no.masld, results.t.pbc.no.masld,
@@ -5769,8 +5569,8 @@ correlation_liver_plasma_pbc_healthy_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_liver_plasma_pbc_healthy_no_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_liver_plasma_pbc_healthy_no_masld.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_no_masld, device = "jpeg")
 
 # only for significant proteins:
 
@@ -5803,8 +5603,8 @@ correlation_sign_liver_plasma_pbc_healthy_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_no_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_healthy_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_no_masld.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_healthy_no_masld, device = "jpeg")
 
 
 correlation_sign_liver_plasma_pbc_healthy_no_masld_1 <- ggplot(combined_results_sign_no_masld, aes(x = FC_liver, 
@@ -5823,8 +5623,8 @@ correlation_sign_liver_plasma_pbc_healthy_no_masld_1
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_no_masld.fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy_no_masld_1, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_no_masld.fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_healthy_no_masld_1, device = "jpeg")
 
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
@@ -5878,8 +5678,8 @@ correlation_sign_no_masld_log2fc_liver_plasma_pbc_healthy_dots <-
 
 correlation_sign_no_masld_log2fc_liver_plasma_pbc_healthy_dots
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_log2fc_sign_no_masld_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_no_masld_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/scatter_correlation_log2fc_sign_no_masld_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_no_masld_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
 
 # Identify Commonly Regulated Proteins
 common_upregulated_no_masld <- combined_results_sign_no_masld %>% filter(log2FC_plasma >= 0 & log2FC_liver >= 0)
@@ -5910,20 +5710,25 @@ common_down.liver_up.plasma_pbc_vs_healthy_no_masld <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_masld,
-#                 "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_masld,
-#                 "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_masld,
-#                 "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_masld,
-#                 "up_liver_and_plasma_pbc_no" = common_up_pbc_vs_healthy_no_masld,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_masld,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_masld,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_masld),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/DE_proteins_fdr0.05_pbc_vs_healthy_no.masld.xlsx")
-
-
+write.xlsx(list("downreg_plasma_pbc_vs_healthy" = down_plasma_pbc_vs_healthy_no_masld,
+               "upreg_plasma_pbc_vs_healthy" = up_plasma_pbc_vs_healthy_no_masld,
+               "downreg_liver_pbc_vs_healthy" = down_liver_pbc_vs_healthy_no_masld,
+               "upreg_liver_pbc_vs_healthy" = up_liver_pbc_vs_healthy_no_masld,
+               "up_liver_and_plasma_pbc_no" = common_up_pbc_vs_healthy_no_masld,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_healthy_no_masld,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_healthy_no_masld,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_healthy_no_masld),
+          "../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/DE_proteins_fdr0.05_pbc_vs_healthy_no.masld.xlsx")
 
 
 ##################### Paired liver and plasma - PBC vs Healthy and MASLD
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_h.m <- merge(results.p.pbc.h.m, results.t.pbc.h.m,
@@ -5962,9 +5767,8 @@ correlation_liver_plasma_pbc_h.m <-
 correlation_liver_plasma_pbc_h.m
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_liver_plasma_pbc_healthy_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_liver_plasma_pbc_healthy_masld.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m, device = "jpeg")
 
 # only for significant proteins:
 
@@ -5997,9 +5801,8 @@ correlation_sign_liver_plasma_pbc_h.m <- ggplot(combined_results_sign_h.m, aes(x
 correlation_sign_liver_plasma_pbc_h.m
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m, device = "jpeg")
 
 
 correlation_sign_liver_plasma_pbc_h.m_1 <- ggplot(combined_results_sign_h.m, aes(x = FC_liver, 
@@ -6012,9 +5815,8 @@ correlation_sign_liver_plasma_pbc_h.m_1 <- ggplot(combined_results_sign_h.m, aes
 correlation_sign_liver_plasma_pbc_h.m_1
  
 # Save plot
- 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_1, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_masld.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_1, device = "jpeg")
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
 ## Create a new column in your dataframe for colouring of only the dots
@@ -6067,8 +5869,8 @@ correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots <-
 
 correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_log2fc_sign_h.m_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/scatter_correlation_log2fc_sign_h.m_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
 
 # Identify Commonly Regulated Proteins
 common_upregulated_h.m <- combined_results_sign_h.m %>% filter(log2FC_plasma >= 0 & log2FC_liver >= 0)
@@ -6098,19 +5900,25 @@ common_down.liver_up.plasma_pbc_vs_h.m <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m,
-#                 "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m,
-#                 "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m,
-#                 "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m,
-#                 "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m,
+               "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m,
+               "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m,
+                 "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m,
+               "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m),
+          "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld.xlsx")
 
 
 ##################### Paired liver and plasma - PBC vs Healthy and MASLD - without outliers ####################
 
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_h.m_no_outliers <- merge(results.p.pbc.h.m_no_outliers, results.t.pbc.h.m.no_outliers,
@@ -6150,9 +5958,8 @@ correlation_liver_plasma_pbc_h.m_no_outliers <-
 correlation_liver_plasma_pbc_h.m_no_outliers
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_fc_liver_plasma_pbc_healthy_masld_without_outliers.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_fc_liver_plasma_pbc_healthy_masld_without_outliers.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m_no_outliers, device = "jpeg")
 
 # only for significant proteins:
 
@@ -6185,9 +5992,8 @@ correlation_sign_liver_plasma_pbc_h.m_no_outliers <- ggplot(combined_results_sig
 correlation_sign_liver_plasma_pbc_h.m_no_outliers
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld_without_outliers.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld_without_outliers.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_outliers, device = "jpeg")
 
 correlation_sign_liver_plasma_pbc_h.m_1_no_outliers <- ggplot(combined_results_sign_h.m_no_outliers, aes(x = FC_liver, 
                                                                                                          y = FC_plasma)) +
@@ -6253,8 +6059,8 @@ correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots_no_outliers <-
 
 correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots_no_outliers
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_log2fc_sign_h.m_liver_plasma_pbc_healthy_dots_without_outliers_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots_no_outliers, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/scatter_correlation_log2fc_sign_h.m_liver_plasma_pbc_healthy_dots_without_outliers_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_h.m_log2fc_liver_plasma_pbc_healthy_dots_no_outliers, device = "jpeg")
 
 # Identify Commonly Regulated Proteins
 
@@ -6289,19 +6095,26 @@ common_down.liver_up.plasma_pbc_vs_h.m_no_outliers <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m_no_outliers,
-#                 "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m_no_outliers,
-#                 "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m_no_outliers,
-#                 "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m_no_outliers,
-#                 "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m_no_outliers,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m_no_outliers,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m_no_outliers,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m_no_outliers),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld_without_outliers.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m_no_outliers,
+               "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m_no_outliers,
+               "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m_no_outliers,
+               "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m_no_outliers,
+               "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m_no_outliers,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m_no_outliers,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m_no_outliers,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m_no_outliers),
+          "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/Without outliers/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld_without_outliers.xlsx")
 
 
 
 #################### Paired liver and plasma without cirrhosis #######################
+
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_h.m_no_c <- merge(results.p.pbc.h.m.no.c, results.t.pbc.h.m.no.c,
@@ -6342,9 +6155,8 @@ correlation_liver_plasma_pbc_h.m_no_c <-
 correlation_liver_plasma_pbc_h.m_no_c
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_liver_plasma_all_proteins_named_pbc_healthy_masld_no_cirrhosis.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_liver_plasma_all_proteins_named_pbc_healthy_masld_no_cirrhosis.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m_no_c, device = "jpeg")
 
 # Only for significant proteins:
 
@@ -6376,9 +6188,8 @@ correlation_sign_liver_plasma_pbc_h.m_no_c <- ggplot(combined_results_sign_h.m_n
 correlation_sign_liver_plasma_pbc_h.m_no_c
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld_no_cirrhosis.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_healthy_masld_no_cirrhosis.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_c, device = "jpeg")
 
 correlation_sign_liver_plasma_pbc_h.m_no_c_1 <- ggplot(combined_results_sign_h.m_no_c, aes(x = FC_liver, 
                                                                                             y = FC_plasma)) +
@@ -6391,8 +6202,8 @@ correlation_sign_liver_plasma_pbc_h.m_no_c_1
  
 # Save plot
  
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_masld_no_cirrhosis.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_c_1, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_fc_sign_liver_plasma_pbc_healthy_masld_no_cirrhosis.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_c_1, device = "jpeg")
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
 ## Create a new column in your dataframe for colouring of only the dots
@@ -6445,8 +6256,8 @@ correlation_sign_h.m_no_c_log2fc_liver_plasma_pbc_healthy_dots <-
 
 correlation_sign_h.m_no_c_log2fc_liver_plasma_pbc_healthy_dots
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_log2fc_sign_h.m_no_c_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_h.m_no_c_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/scatter_correlation_log2fc_sign_h.m_no_c_liver_plasma_pbc_healthy_dots_fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_h.m_no_c_log2fc_liver_plasma_pbc_healthy_dots, device = "jpeg")
 
 # Identify Commonly Regulated Proteins
 common_upregulated_h.m_no_c <- combined_results_sign_h.m_no_c %>% filter(log2FC_plasma >= 0 & log2FC_liver >= 0)
@@ -6477,20 +6288,25 @@ common_down.liver_up.plasma_pbc_vs_h.m_no_c <-
 
 ######################## Save in an excel file
 
-# write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m_no_c,
-#                 "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m_no_c,
-#                 "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m_no_c,
-#                 "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m_no_c,
-#                 "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m_no_c,
-#                 "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m_no_c,
-#                 "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m_no_c,
-#                 "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m_no_c),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld_no_cir.xlsx")
+write.xlsx(list("downreg_plasma_pbc_vs_h_and_m" = down_plasma_pbc_vs_h.m_no_c,
+               "upreg_plasma_pbc_vs_h_and_m" = up_plasma_pbc_vs_h.m_no_c,
+               "downreg_liver_pbc_vs_h_and_m" = down_liver_pbc_vs_h.m_no_c,
+               "upreg_liver_pbc_vs_h_and_m" = up_liver_pbc_vs_h.m_no_c,
+               "up_liver_and_plasma_pbc" = common_up_pbc_vs_h.m_no_c,
+               "down_liver_and_plasma_pbc" = common_down_pbc_vs_h.m_no_c,
+               "up_liver_down_plasma_pbc" = common_up.liver_down.plasma_pbc_vs_h.m_no_c,
+               "down_liver_up_plasma_pbc" = common_down.liver_up.plasma_pbc_vs_h.m_no_c),
+          "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/DE_proteins_fdr0.05_pbc_vs_healthy_and_masld_no_cir.xlsx")
 
 
 ##################### paired liver and plasma PBC without MASLD vs. Healthy and MASLD ################ 
 
-
+# Create output directory
+dir.create(
+  "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
 # Combine Results Tables with Subject IDs, excluding proteins not present in both datasets
 combined_results_h.m_no_masld <- merge(results.p.pbc.h.m.no.masld, results.t.pbc.h.m.no.masld,
@@ -6532,8 +6348,8 @@ correlation_liver_plasma_pbc_h.m_no_masld
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_liver_plasma_pbc_h.m_no_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_liver_plasma_pbc_healthy_h.m_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_liver_plasma_pbc_h.m_no_masld.jpeg",
+       width = 10, height = 10, plot = correlation_liver_plasma_pbc_h.m_no_masld, device = "jpeg")
 
 # only for significant proteins:
 
@@ -6565,9 +6381,8 @@ correlation_sign_liver_plasma_pbc_h.m_no_masld
 
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_h.m_no_masld.jpeg",
-#         width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_sign_liver_plasma_all_proteins_named_pbc_h.m_no_masld.jpeg",
+       width = 10, height = 10, plot = correlation_sign_liver_plasma_pbc_h.m_no_masld, device = "jpeg")
 
 
 correlation_sign_liver_plasma_pbc_h.m_no_masld_1 <- ggplot(combined_results_sign_h.m_no_masld, aes(x = FC_liver, 
@@ -6586,8 +6401,8 @@ correlation_sign_liver_plasma_pbc_h.m_no_masld_1
 
 # Save plot
 
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_sign_liver_plasma_pbc_h.m_no_masld.fdr0.05.jpeg",
-#         width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_h.m_no_masld_1, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/scatter_correlation_fc_sign_liver_plasma_pbc_h.m_no_masld.fdr0.05.jpeg",
+       width = 8, height = 6, plot = correlation_sign_liver_plasma_pbc_h.m_no_masld_1, device = "jpeg")
 
 # log2fc scatterplot liver/plasma with colouring according to regulation in liver and plasma
 ## Create a new column in your dataframe for colouring of only the dots
@@ -6673,15 +6488,15 @@ common_down.liver_up.plasma_pbc_vs_h.m_no_masld <-
   common_downreg.liver_upreg.plasma_h.m_no_masld[, c("GeneName.UniprotID","GeneName", "UniProtID", "log2FC_plasma", "adj.P.Val_plasma","log2FC_liver",
                                              "adj.P.Val_liver")]
 
-# write.xlsx(list("down_plasma_pbc_no_masld" = down_plasma_pbc_vs_h.m_no_masld,
-#                 "up_plasma_pbc_no_masld" = up_plasma_pbc_vs_h.m_no_masld,
-#                 "down_liver_pbc_no_masld" = down_liver_pbc_vs_h.m_no_masld,
-#                 "up_liver_pbc_no_masld" = up_liver_pbc_vs_h.m_no_masld,
-#                 "up_both_pbc_no_masld" = common_up_pbc_vs_h.m_no_masld,
-#                 "down_both_pbc_no_masld" = common_down_pbc_vs_h.m_no_masld,
-#                 "up_l_down_p_pbc_no_masld" = common_up.liver_down.plasma_pbc_vs_h.m_no_masld,
-#                 "down_l_up_p_pbc_no_masld" = common_down.liver_up.plasma_pbc_vs_h.m_no_masld),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/DE_proteins_fdr0.05_pbc_vs_h.m_no.masld.xlsx")
+write.xlsx(list("down_plasma_pbc_no_masld" = down_plasma_pbc_vs_h.m_no_masld,
+               "up_plasma_pbc_no_masld" = up_plasma_pbc_vs_h.m_no_masld,
+               "down_liver_pbc_no_masld" = down_liver_pbc_vs_h.m_no_masld,
+               "up_liver_pbc_no_masld" = up_liver_pbc_vs_h.m_no_masld,
+               "up_both_pbc_no_masld" = common_up_pbc_vs_h.m_no_masld,
+               "down_both_pbc_no_masld" = common_down_pbc_vs_h.m_no_masld,
+               "up_l_down_p_pbc_no_masld" = common_up.liver_down.plasma_pbc_vs_h.m_no_masld,
+               "down_l_up_p_pbc_no_masld" = common_down.liver_up.plasma_pbc_vs_h.m_no_masld),
+          "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No MASLD/DE_proteins_fdr0.05_pbc_vs_h.m_no.masld.xlsx")
 
 ### PBC vs. Healthy
 
@@ -6756,11 +6571,11 @@ merged_results_up_t_pbc <- filtered_up_t_pbc %>%
 
 # Save in an excel file
 
-# write.xlsx(list("down_plasma" = merged_results_down_p_pbc,
-#                 "up_plasma" = merged_results_up_p_pbc,
-#                 "down_liver" = merged_results_down_t_pbc,
-#                 "up_liver" = merged_results_up_t_pbc),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/proteins_no_longer_diff_exp_when_excluding_cirrhosis_pbc_vs_healthy.xlsx")
+write.xlsx(list("down_plasma" = merged_results_down_p_pbc,
+               "up_plasma" = merged_results_up_p_pbc,
+               "down_liver" = merged_results_down_t_pbc,
+               "up_liver" = merged_results_up_t_pbc),
+          "../output/FDR0.05_all/PBC_vs_Healthy/proteins_no_longer_diff_exp_when_excluding_cirrhosis_pbc_vs_healthy.xlsx")
 
 
 ################ Create Excel file with proteins affected by excluding outliers
@@ -6963,15 +6778,15 @@ merged_new_up_t_pbc_outliers <- filtered_new_up_t_pbc_total %>%
   )
 
 
-# write.xlsx(list("lost_down_plasma" = merged_lost_down_p_pbc_outliers,
-#                 "lost_up_plasma" = merged_lost_up_p_pbc_outliers,
-#                 "lost_down_liver" = merged_lost_down_t_pbc_outliers,
-#                 "lost_up_liver" = merged_lost_up_t_pbc_outliers,
-#                 "new_down_plasma" = merged_new_down_p_pbc_outliers,
-#                 "new_up_plasma" = merged_new_up_p_pbc_outliers,
-#                 "new_down_liver" = merged_new_down_t_pbc_outliers,
-#                 "new_up_liver" = merged_new_up_t_pbc_outliers),
-#            "../output/FDR0.05_all/PBC_vs_Healthy/proteins_changed_significance_when_excluding_outliers_pbc_vs_healthy.xlsx")
+write.xlsx(list("lost_down_plasma" = merged_lost_down_p_pbc_outliers,
+               "lost_up_plasma" = merged_lost_up_p_pbc_outliers,
+               "lost_down_liver" = merged_lost_down_t_pbc_outliers,
+               "lost_up_liver" = merged_lost_up_t_pbc_outliers,
+               "new_down_plasma" = merged_new_down_p_pbc_outliers,
+               "new_up_plasma" = merged_new_up_p_pbc_outliers,
+               "new_down_liver" = merged_new_down_t_pbc_outliers,
+               "new_up_liver" = merged_new_up_t_pbc_outliers),
+            "../output/FDR0.05_all/PBC_vs_Healthy/proteins_changed_significance_when_excluding_outliers_pbc_vs_healthy.xlsx")
 
 
 
@@ -7039,11 +6854,11 @@ merged_results_up_t_pbc_h.m <- filtered_up_t_pbc_h.m %>%
 
 # Save in an excel file
 
-# write.xlsx(list("down_plasma" = merged_results_down_p_pbc_h.m,
-#                 "up_plasma" = merged_results_up_p_pbc_h.m,
-#                 "down_liver" = merged_results_down_t_pbc_h.m,
-#                 "up_liver" = merged_results_up_t_pbc_h.m),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/proteins_no_longer_diff_exp_when_excluding_cirrhosis_pbc_vs_healthy_and_masld.xlsx")
+write.xlsx(list("down_plasma" = merged_results_down_p_pbc_h.m,
+               "up_plasma" = merged_results_up_p_pbc_h.m,
+               "down_liver" = merged_results_down_t_pbc_h.m,
+               "up_liver" = merged_results_up_t_pbc_h.m),
+            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/proteins_no_longer_diff_exp_when_excluding_cirrhosis_pbc_vs_healthy_and_masld.xlsx")
 
 
 
@@ -7248,15 +7063,15 @@ merged_new_up_t_pbc_h.m_outliers <- filtered_new_up_t_pbc_h.m_total %>%
   )
 
 
-# write.xlsx(list("lost_down_plasma" = merged_lost_down_p_pbc_h.m_outliers,
-#                 "lost_up_plasma" = merged_lost_up_p_pbc_h.m_outliers,
-#                 "lost_down_liver" = merged_lost_down_t_pbc_h.m_outliers,
-#                 "lost_up_liver" = merged_lost_up_t_pbc_h.m_outliers,
-#                 "new_down_plasma" = merged_new_down_p_pbc_h.m_outliers,
-#                 "new_up_plasma" = merged_new_up_p_pbc_h.m_outliers,
-#                 "new_down_liver" = merged_new_down_t_pbc_h.m_outliers,
-#                 "new_up_liver" = merged_new_up_t_pbc_h.m_outliers),
-#            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/proteins_changed_significance_when_excluding_outliers_pbc_vs_healthy_and_masld.xlsx")
+write.xlsx(list("lost_down_plasma" = merged_lost_down_p_pbc_h.m_outliers,
+               "lost_up_plasma" = merged_lost_up_p_pbc_h.m_outliers,
+               "lost_down_liver" = merged_lost_down_t_pbc_h.m_outliers,
+               "lost_up_liver" = merged_lost_up_t_pbc_h.m_outliers,
+               "new_down_plasma" = merged_new_down_p_pbc_h.m_outliers,
+               "new_up_plasma" = merged_new_up_p_pbc_h.m_outliers,
+               "new_down_liver" = merged_new_down_t_pbc_h.m_outliers,
+               "new_up_liver" = merged_new_up_t_pbc_h.m_outliers),
+            "../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/proteins_changed_significance_when_excluding_outliers_pbc_vs_healthy_and_masld.xlsx")
 
 #################### Venn diagram
 
@@ -7282,8 +7097,8 @@ venn_plot_total <- ggvenn(input_total, fill_color = c("royal blue","brown"),
  
 venn_plot_total
  
-# ggsave("../output/venn_total.jpeg",
-#         width = 12, height = 12, plot = venn_plot_total, device = "jpeg")
+ggsave("../output/venn_total.jpeg",
+       width = 12, height = 12, plot = venn_plot_total, device = "jpeg")
 
 ### Venn PBC vs Healthy
  
@@ -7308,9 +7123,8 @@ venn_plot_pbc <- ggvenn(input_pbc, fill_color = c("royal blue","brown"),
 venn_plot_pbc
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/venn_pbc_healthy_fdr0.05.jpeg",
-#         width = 12, height = 12, plot = venn_plot_pbc, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/venn_pbc_healthy_fdr0.05.jpeg",
+       width = 12, height = 12, plot = venn_plot_pbc, device = "jpeg")
 
 ########## Venn diagram without cirrhosis
 
@@ -7335,9 +7149,8 @@ venn_plot_pbc_no_c <- ggvenn(input_pbc_no_c, fill_color = c("royal blue","brown"
 venn_plot_pbc_no_c
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/venn_pbc_healthy_fdr0.05_no_cirrhosis.jpeg",
-#         width = 12, height = 12, plot = venn_plot_pbc_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No cirrhosis/venn_pbc_healthy_fdr0.05_no_cirrhosis.jpeg",
+       width = 12, height = 12, plot = venn_plot_pbc_no_c, device = "jpeg")
 
 
 ###### Venn Diagram PBC without MASLD vs. healthy
@@ -7363,9 +7176,8 @@ venn_plot_pbc_no_masld <- ggvenn(input_pbc_no_masld, fill_color = c("royal blue"
 venn_plot_pbc_no_masld 
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/venn_pbc_healthy_fdr0.05_no_masld.jpeg",
-#         width = 12, height = 12, plot = venn_plot_pbc_no_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/No MASLD/venn_pbc_healthy_fdr0.05_no_masld.jpeg",
+       width = 12, height = 12, plot = venn_plot_pbc_no_masld, device = "jpeg")
 
 ### Venn PBC vs MASLD
 
@@ -7391,9 +7203,8 @@ venn_plot_pbc_masld <- ggvenn(input_pbc_masld, fill_color = c("royal blue","brow
 venn_plot_pbc_masld
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/venn_pbc_masld_fdr0.05.jpeg",
-#         width = 10, height = 10, plot = venn_plot_pbc_masld, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/All/venn_pbc_masld_fdr0.05.jpeg",
+       width = 10, height = 10, plot = venn_plot_pbc_masld, device = "jpeg")
 
 ### Venn PBC vs MASLD, no cirrhosis
 
@@ -7419,8 +7230,8 @@ venn_plot_pbc_masld_no_c <- ggvenn(input_pbc_masld_no_c, fill_color = c("royal b
 venn_plot_pbc_masld_no_c
 
 # Save plot
-# ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/venn_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
-#         width = 10, height = 10, plot = venn_plot_pbc_masld_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_MASLD/No cirrhosis/venn_pbc_masld_fdr0.05_no.cirrhosis.jpeg",
+       width = 10, height = 10, plot = venn_plot_pbc_masld_no_c, device = "jpeg")
 
 
 ### PBC vs Healthy and MASLD 
@@ -7446,8 +7257,8 @@ venn_plot_pbc_h.m <- ggvenn(input_pbc_h.m, fill_color = c("royal blue","brown"),
 venn_plot_pbc_h.m
 
 # Save plot
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/venn_pbc_h.m_fdr0.05.jpeg",
-#         width = 15, height = 12, plot = venn_plot_pbc_h.m, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/All/venn_pbc_h.m_fdr0.05.jpeg",
+       width = 15, height = 12, plot = venn_plot_pbc_h.m, device = "jpeg")
 
 ########## Venn diagram without cirrhosis
 
@@ -7472,9 +7283,8 @@ venn_plot_pbc_h.m_no_c <- ggvenn(input_pbc_h.m_no_c, fill_color = c("royal blue"
 venn_plot_pbc_h.m_no_c
 
 # Save plot
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/venn_pbc_h.m_fdr0.05_no_cirrhosis.jpeg",
-#         width = 16, height = 10, plot = venn_plot_pbc_h.m_no_c, device = "jpeg")
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy_and_MASLD/No cirrhosis/venn_pbc_h.m_fdr0.05_no_cirrhosis.jpeg",
+       width = 16, height = 10, plot = venn_plot_pbc_h.m_no_c, device = "jpeg")
 
 
 #### GO enrichment ####
@@ -7574,8 +7384,8 @@ p_plasma <- ggplot(plot_df, aes(x = Count, y = Term, fill = ONTOLOGY)) +
 
 print(p_plasma)
 
-# ggsave("../output/GO_enrichment_plasma_pbc_vs_healthy.jpeg",
-#         p_plasma, width = 8, height = 10, dpi = 300)
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/GO_enrichment_plasma_pbc_vs_healthy.jpeg",
+       p_plasma, width = 8, height = 10, dpi = 300)
 
 
 #### GO Liver ####
@@ -7641,117 +7451,6 @@ p_liver <- ggplot(plot_df_t, aes(x = Count, y = Term, fill = ONTOLOGY)) +
 
 print(p_liver)
 
-# ggsave("GO_enrichment_liver_pbc_vs_healthy.jpeg",
-#        p_liver, width = 8, height = 10, dpi = 300)
-
-################################# Enrichment analysis GOBP ############################################
-
-library("BiocManager")
-library("clusterProfiler")
-library("org.Hs.eg.db") # For human gene annotations, adjust for other species if needed
-library("AnnotationDbi")
-library(dplyr)
-
-# 1. Provide a list of gene symbols or Entrez IDs which we're interested in analyzing for enrichment.
-# 2. The org.Hs.eg.db package contains annotation mappings for genes in the specified organism (in this case, human). 
-#   It includes mappings between gene symbols, Entrez IDs, and various other identifiers, as well as associated 
-#   annotation data like GO terms.
-# 3. enrichGO uses the provided gene list and the organism database to determine whether certain GO terms are 
-#   overrepresented in your gene list compared to what would be expected by chance. It calculates enrichment scores 
-#   and associated statistics, such as adjusted p-values (q-values) using methods like the Benjamini-Hochberg (BH) 
-#   correction for multiple testing.
-# 4. The result of enrichGO is a data frame containing enriched GO terms along with associated statistics like p-values, 
-#   adjusted p-values (q-values), and gene counts. This output helps identify which biological processes, 
-#   molecular functions, or cellular components are overrepresented in gene list. So, even though we don't 
-#   explicitly provide p-values or significance values, enrichGO calculates these statistics based on the gene 
-#   list we provided and the annotations available in the organism database.
-
-#################### PBC vs. Healthy plasma  #######################################################################
-
-dim(selected_proteins_p_pbc) # those proteins that have an adj p value < 0.05
-selected_proteins_p_pbc[1:5,]
-
-# Map gene symbols to Entrez IDs (required for clusterProfiler)http://127.0.0.1:17963/graphics/plot_zoom_png?width=1872&height=900
-gene_ids_p_pbc <- AnnotationDbi::select(org.Hs.eg.db, 
-                                        keys = selected_proteins_p_pbc$UniProtID, 
-                                        columns = c("ENTREZID"), 
-                                        keytype = "UNIPROT")
-
-# Remove any NA values that might be present
-dim(gene_ids_p_pbc)
-gene_ids_p_pbc[1:10,]
-gene_ids_p_pbc <- na.omit(gene_ids_p_pbc)
-dim(gene_ids_p_pbc)
-
-# Perform GO enrichment analysis - first biological procesess
-go_enrich_p_pbc_bp <- enrichGO(gene = gene_ids_p_pbc$ENTREZID, 
-                               OrgDb = org.Hs.eg.db, 
-                               keyType = "ENTREZID", 
-                               ont = "BP", # Can be "BP", "MF", or "CC" for Biological Process, Molecular Function, or Cellular Component
-                               pAdjustMethod = "BH", 
-                               pvalueCutoff = 0.05, 
-                               qvalueCutoff = 0.05)
-
-# View the results
-head(go_enrich_p_pbc_bp)
-
-# Visualize the results
-barplot(go_enrich_p_pbc_bp, showCategory = 20)
-
-go_enrich_p_pbc_bp_dotplot <- dotplot(go_enrich_p_pbc_bp, showCategory = 20) +
-  theme(axis.text.y = element_text(size = 10)) # Adjust text size
-go_enrich_p_pbc_bp_dotplot
-
-# Save the plot using ggsave
-
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/enrich_bp_plasma_pbc_healthy_fdr0.05.jpeg",
-#         width = 12, height = 12, plot = go_enrich_p_pbc_bp_dotplot, dpi = 300, device = "jpeg")
-
-# Now Molecular function
-go_enrich_p_pbc_mf <- enrichGO(gene = gene_ids_p_pbc$ENTREZID, 
-                               OrgDb = org.Hs.eg.db, 
-                               keyType = "ENTREZID", 
-                               ont = "MF", # Can be "BP", "MF", or "CC" for Biological Process, Molecular Function, or Cellular Component
-                               pAdjustMethod = "BH", 
-                               pvalueCutoff = 0.05, 
-                               qvalueCutoff = 0.05)
-
-# View the results
-head(go_enrich_p_pbc_mf)
-
-# Visualize the results
-barplot(go_enrich_p_pbc_mf, showCategory = 20)
-
-go_enrich_p_pbc_mf_dotplot <- dotplot(go_enrich_p_pbc_mf, showCategory = 20) +
-  theme(axis.text.y = element_text(size = 10)) # Adjust text size
-go_enrich_p_pbc_mf_dotplot
-
-# Save the plot using ggsave
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/enrich_mf_plasma_pbc_healthy_fdr0.05.jpeg",
-#         width = 12, height = 12, plot = go_enrich_p_pbc_mf_dotplot, dpi = 300, device = "jpeg")
-
-# Now cellular component
-go_enrich_p_pbc_cc <- enrichGO(gene = gene_ids_p_pbc$ENTREZID, 
-                               OrgDb = org.Hs.eg.db, 
-                               keyType = "ENTREZID", 
-                               ont = "CC", # Can be "BP", "MF", or "CC" for Biological Process, Molecular Function, or Cellular Component
-                               pAdjustMethod = "BH", 
-                               pvalueCutoff = 0.05, 
-                               qvalueCutoff = 0.05)
-
-# View the results
-head(go_enrich_p_pbc_cc)
-
-# Visualize the results
-barplot(go_enrich_p_pbc_cc, showCategory = 20)
-
-go_enrich_p_pbc_cc_dotplot <- dotplot(go_enrich_p_pbc_cc, showCategory = 20) +
-  theme(axis.text.y = element_text(size = 10)) # Adjust text size
-go_enrich_p_pbc_cc_dotplot
-
-# Save the plot using ggsave
-# ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/enrich_cc_plasma_pbc_healthy_fdr0.05.jpeg",
-#         width = 12, height = 12, plot = go_enrich_p_pbc_cc_dotplot, dpi = 300, device = "jpeg")
-
-
+ggsave("../output/FDR0.05_all/PBC_vs_Healthy/All/GO_enrichment_liver_pbc_vs_healthy.jpeg",
+       p_liver, width = 8, height = 10, dpi = 300)
 

@@ -1,0 +1,925 @@
+---
+title: "Autoimmune liver diseases UKB"
+author: "Jesper Sloth Kellemann and Anne-Sofie H. Jensen"
+date: "2026-08-05"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r echo=T, results='hide', warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(ukbtools)
+library(data.table)
+library(dplyr)
+df <- fread(here("data-raw/ukb_all_datasets.csv"), data.table = FALSE)
+getwd()
+nrow(df) # 502488
+```
+
+### Remove individuals who have withdrawn
+```{r echo=T, results='hide', message=FALSE, warning=FALSE}
+withdraw <- read_csv(here("data-raw/withdrawal_2024-12-17.csv"), col_names = "eid") 
+df <- anti_join(df, withdraw, by = "eid")
+nrow(df) # 502133
+```
+
+### Retrieving ICD diagnoses
+```{r}
+ukb_icd_code_meaning(icd.code = c("K732", "K754", "K738", "K743", "K70", "K760","K703","B180","B181","B182","K746","I850","I859","I982","I983","K766","K767","K729",
+                                  "I10","I110","I119","I120","I129","I130","I131","I132","I139","I150","I151","I152","I158","I159","E10","E11","E14"), icd.version = 10)
+```
+
+### Import ICD10 dates dataframe and merge
+df_icd contain data from our project "Olink All proteins" on DNA nexus from 13.02.2024.
+df contain data from UKB participants without those who have withdrawn up until 17.12.2024 (see name of withdrawal file); therefore fewer eids.
+```{r echo=TRUE, results = 'hide'}
+df_icd <- fread(here("data-raw/ICD10_dates_Fie.csv"), data.table = FALSE)
+dim(df_icd) # 502202 
+df_icd[1:3,]
+dim(df) # 502133
+
+# Check if all "eid" rows in df are present in the "eid" column of df_icd
+all(df$eid %in% df_icd$eid)
+
+# Merge the dataframes by 'eid', keeping only those eids present in both dataframes
+df <- merge(df_icd, df, by = "eid", all = FALSE)
+dim(df) # 502131
+```
+
+### Import dataset with extra liver test variables
+lt contain data from our project "Olink All proteins" on DNA nexus from 13.02.2024 (like df_icd and now df)
+ALT, AST, ALP, GGT are U/L in UKB. Bilirubin is umol/L
+```{r echo=TRUE, results = 'hide'}
+lt <- fread(here("data-raw/livertests.csv"), data.table = FALSE)
+dim(lt)
+lt[1:3,]
+df$alanine_aminotransferase_f30620_0_0
+# Rename variables
+lt$ALP_base <- lt$p30610_i0
+lt$bili_base <- lt$p30840_i0
+lt$AST_base <- lt$p30650_i0
+lt$GGT_base <- lt$p30730_i0
+dim(lt)
+lt[1:3,]
+
+# Subset the lt dataframe
+lt_subset <- lt %>% select(eid, ALP_base, bili_base, AST_base, GGT_base)
+dim(lt)
+dim(lt_subset)
+lt_subset[1:3,]
+```
+
+### Merge lt dataset and df dataset by eid
+```{r echo=T, results='hide'}
+dim(lt_subset) # 502202
+dim(df) # 502131
+all(df$eid %in% lt_subset$eid) # same eids
+
+# Merge the dataframes by 'eid'
+dim(df)
+dim(lt_subset)
+df <- merge(lt_subset, df, by = "eid", all = FALSE)
+dim(df) # 502131
+```
+
+### Import enrollment date
+enroll contain data from our project "Olink All proteins" on DNA nexus from 13.02.2024 (like df_merge)
+```{r echo=TRUE, results = 'hide'}
+enroll <- fread(here("data-raw/enrollemnt_date.csv"), data.table = FALSE)
+dim(enroll) # 502202
+enroll[1:3,]
+enroll$enroll_date <- enroll$p53_i0
+enroll <- enroll[,c(1,3)]
+enroll[1:3,]
+```
+
+### Merge enroll dataset and df dataset by eid
+```{r echo=TRUE, results = 'hide'}
+dim(df)
+dim(enroll)
+df <- merge(df, enroll, by = "eid", all = FALSE)
+dim(df)
+df[1:3,947:949]
+```
+
+### Create diagnoses TRUE/NA
+Autoimmune liver diseases and cirrhosis
+```{r echo=T, results='hide'}
+
+# New AIH column and make AIH TRUE if not NA in date column K732, K738, K754
+df$AIH <- NA
+aih_non_na_dates <- df %>%
+  filter(!is.na(date_K732) | !is.na(date_K738) | !is.na(date_K754)) %>%
+  pull(eid)
+
+# Update the AIH column
+df <- df %>%
+  mutate(AIH = ifelse(eid %in% aih_non_na_dates, TRUE, AIH))
+
+# Check the updated AIH column
+table(df$AIH, useNA = "ifany") # 444 cases
+
+# New PBC column and make PBC TRUE if not NA in date column K743
+df$PBC <- NA
+pbc_non_na_dates <- df %>%
+  filter(!is.na(date_K743)) %>%
+  pull(eid)
+
+# Update the PBC column
+df <- df %>%
+  mutate(PBC = ifelse(eid %in% pbc_non_na_dates, TRUE, PBC))
+
+# Check the updated PBC column
+table(df$PBC, useNA = "ifany") # 451
+
+# Make individuals having both AIH and PBC (overlap syndrome) into a new variable (AIH.PBC)
+df %>%
+      count(AIH,PBC) # 45 with overlap
+
+df$AIH.PBC[df$AIH==T & df$PBC ==T] <- TRUE
+df$AIH[df$AIH.PBC == T] <- NA
+df$PBC[df$AIH.PBC == T] <- NA
+
+df %>%
+      count(AIH,PBC,AIH.PBC) # 399, 406, 45 respectively
+
+# Add chronic hep B
+df$HBV <- NA
+hbv_non_na_dates <- df %>%
+  filter(!is.na(date_B180) | !is.na(date_B181)) %>%
+  pull(eid)
+
+# Update the HBV column
+df <- df %>%
+  mutate(HBV = ifelse(eid %in% hbv_non_na_dates, TRUE, HBV))
+
+# Check the updated HBV column
+table(df$HBV, useNA = "ifany") # 365 cases
+
+# Add chronic hep C
+df$HCV <- NA
+hcv_non_na_dates <- df %>%
+  filter(!is.na(date_B182)) %>%
+  pull(eid)
+
+# Update the HCV column
+df <- df %>%
+  mutate(HCV = ifelse(eid %in% hcv_non_na_dates, TRUE, HCV))
+
+# Check the updated HCV column
+table(df$HCV, useNA = "ifany") # 521 cases
+
+# Make those with AIH that have concurrent HBV/HCV as AIH-NA (i.e. not having AIH)
+
+df %>%
+      count(AIH,HBV,HCV) # 26 individuals
+
+df$AIH[df$HBV == T & is.na(df$HCV)] <- NA
+df$AIH[is.na(df$HBV) & df$HCV == T] <- NA
+df$AIH[df$HBV == T & df$HCV == T] <- NA
+
+table(df$AIH) # 373 individuals
+
+# Same with PBC and concurrent HBV/HCV
+
+df %>%
+      count(PBC,HBV,HCV)  # 3 individuals
+
+df$PBC[df$HBV == T & is.na(df$HCV)] <- NA
+df$PBC[is.na(df$HBV) & df$HCV == T] <- NA
+
+table(df$PBC) # 403
+
+# None with AIH.PBC and concurrent HBV/HCV
+
+df %>%
+      count(AIH.PBC,HBV) 
+
+df %>%
+      count(AIH.PBC,HCV) 
+
+# Cirrhosis
+df$cir <- NA
+cir_non_na_dates <- df %>%
+  filter(!is.na(date_K746) | !is.na(date_I850) | !is.na(date_I859) | !is.na(date_I982) | !is.na(date_I983) | !is.na(date_K729) | !is.na(date_K703) |
+             !is.na(date_K766) | !is.na(date_K767)) %>%
+  pull(eid)
+
+# Update the cir column
+df <- df %>%
+  mutate(cir = ifelse(eid %in% cir_non_na_dates, TRUE, cir))
+```
+
+Calculate sum of average weekly intake of alcohol
+```{r echo=TRUE, results='hide'}
+# Set prefer not to answer and do not know (-1 and -3) to NA
+df$average_weekly_beer_plus_cider_intake_f1588_0_0[df$average_weekly_beer_plus_cider_intake_f1588_0_0<0] <- NA
+df$average_weekly_champagne_plus_white_wine_intake_f1578_0_0[df$average_weekly_champagne_plus_white_wine_intake_f1578_0_0<0] <- NA
+df$average_weekly_fortified_wine_intake_f1608_0_0[df$average_weekly_fortified_wine_intake_f1608_0_0<0] <- NA
+df$average_weekly_intake_of_other_alcoholic_drinks_f5364_0_0[df$average_weekly_intake_of_other_alcoholic_drinks_f5364_0_0<0] <- NA
+df$average_weekly_red_wine_intake_f1568_0_0[df$average_weekly_red_wine_intake_f1568_0_0<0] <- NA
+df$average_weekly_spirits_intake_f1598_0_0[df$average_weekly_spirits_intake_f1598_0_0<0] <- NA
+
+# units of alcohol in beverages: https://www.nhs.uk/live-well/alcohol-advice/calculating-alcohol-units/
+
+# weekly units of alcohol - redwine (f1568), 1 glass = 2.1 units
+df$average_weekly_red_wine_intake_f1568_0_0 <- df$average_weekly_red_wine_intake_f1568_0_0 * 2.1
+# weekly units of alcohol - champagne etc (f1578), 1 glass = 2.1 units
+df$average_weekly_champagne_plus_white_wine_intake_f1578_0_0 <- df$average_weekly_champagne_plus_white_wine_intake_f1578_0_0 * 2.1
+# weekly units of alcohol - beer and cider (f1588), 1 pint = 2 units
+df$average_weekly_beer_plus_cider_intake_f1588_0_0 <- df$average_weekly_beer_plus_cider_intake_f1588_0_0 * 2
+# weekly units of alcohol - spirits (f1598), 1 measure = 1 unit (no calculation needed)
+# weekly units of alcohol - fortified wine (f1608), 1 measure = 1 unit (no calculation needed)
+# weekly units of other alcoholic drinks incl alcopops, 1 glass = 1.5 units
+df$average_weekly_intake_of_other_alcoholic_drinks_f5364_0_0 <- df$average_weekly_intake_of_other_alcoholic_drinks_f5364_0_0 * 1.5
+
+# Calculate the sum of weekly units alcoholic intake
+df <- df %>%
+    rowwise() %>%
+    mutate(weekly_alcohol = sum(average_weekly_beer_plus_cider_intake_f1588_0_0,
+    average_weekly_champagne_plus_white_wine_intake_f1578_0_0,
+    average_weekly_fortified_wine_intake_f1608_0_0,
+    average_weekly_intake_of_other_alcoholic_drinks_f5364_0_0,
+    average_weekly_red_wine_intake_f1568_0_0,
+    average_weekly_spirits_intake_f1598_0_0,
+    na.rm=T))
+```
+
+Defining MASLD
+Based on Rinella et al., JHEP, 2023 
+```{r echo =TRUE, results='hide'}
+
+# Identify source and timing of MASLD classification
+# New masld_icd column and make masld_icd TRUE if not NA in date column K760
+df$masld_icd <- NA
+masld_icd_non_na_dates <- df %>%
+  filter(!is.na(date_K760)) %>%
+  pull(eid)
+
+# Update the masld_icd column
+df <- df %>%
+  mutate(masld_icd = ifelse(eid %in% masld_icd_non_na_dates, TRUE, masld_icd))
+
+# Create masld_icd_prev and masld_icd_inc variables based on timing of K760 diagnosis
+df$masld_icd_prev <- with(df,
+                          ifelse(!is.na(date_K760) & date_K760 <= enroll_date,
+                                 TRUE, FALSE))
+
+df$masld_icd_inc <- with(df,
+                         ifelse(!is.na(date_K760) & date_K760 > enroll_date,
+                                TRUE, FALSE))
+
+# New masld_pdff column and make masld_pdff TRUE if PDFF and alcohol criteria are met
+df$masld_pdff <- NA
+
+df$masld_pdff[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0 == "Female" &
+                 df$weekly_alcohol < 17.5] <- TRUE
+
+df$masld_pdff[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0 == "Male" &
+                 df$weekly_alcohol < 26.25] <- TRUE
+
+# Check source and timing of MASLD classification
+table(df$masld_icd, useNA = "ifany")
+table(df$masld_pdff, useNA = "ifany")
+table(df$masld_icd_prev, useNA = "ifany")
+table(df$masld_icd_inc, useNA = "ifany")
+table(df$masld_icd, df$masld_pdff, useNA = "ifany")
+
+
+# New MASLD column and make MASLD TRUE if not NA in date column 
+df$MASLD <- NA
+masld_non_na_dates <- df %>%
+  filter(!is.na(date_K760)) %>%
+  pull(eid)
+
+# Update the MASLD column
+df <- df %>%
+  mutate(MASLD = ifelse(eid %in% masld_non_na_dates, TRUE, MASLD))
+
+# Number of PDFF measures in dataset with 40534 variable
+table(is.na(df$proton_density_fat_fraction_pdff_f40061_2_0))
+
+# Add pdff > 5.5 for women and men based on alcohol intake (MASLD when drinking less than 140 g alcohol per week for women and less than 210 g alcohol per week for men. 1 unit = 8 g alcohol => NAFLD when less than < 17.5 units alcohol/week for women and 26.25 units alcohol/week for men
+df$MASLD[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0 == "Female" &
+                 df$weekly_alcohol < 17.5] <- T
+df$MASLD[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0 == "Male" &
+                 df$weekly_alcohol<26.25] <- T
+
+table(df$MASLD, useNA = "ifany") # 14183
+```
+
+Check if MASLD criteria are met and if not, make those individuals cryptogenic SLD
+```{r echo =TRUE, results='hide', warning=FALSE, message=FALSE}
+# Create a new column that categorizes BMI as "Below 25" and "25 or Above"
+df$bmi_new <- ifelse(df$body_mass_index_bmi_f21001_0_0 < 25, "Below 25", "25 or Above")
+table(df$MASLD, df$bmi_new, useNA = "ifany") # 1724 with a bmi below 25
+
+# Create new crypt_sld variable with "lean MASLD" (trying to find those MASLD individuals, if any, who do not fulfill MASLD criteria)
+df$crypt_sld <- ifelse(df$MASLD == TRUE & df$bmi_new == "Below 25",TRUE, NA)
+table(df$crypt_sld, useNA = "ifany") # 1724
+
+# Create a new column that categorizes HDL as "low" if HDL is 1 or below for Male and 1.3 or below for Female, else "high" (HDL is mmol/L in UKB)
+df$hdl_new <- ifelse((df$hdl_cholesterol_f30760_0_0 <= 1 & df$hdl_cholesterol_f30760_1_0 <= 1 & df$sex_f31_0_0 == "Male") | 
+                     (df$hdl_cholesterol_f30760_0_0 <= 1.3 & df$hdl_cholesterol_f30760_1_0 <= 1.3 & df$sex_f31_0_0 == "Female"), 
+                     "low", "high")
+table(df$crypt_sld, df$hdl_new, useNA = "ifany") 
+
+# Make those crypt_sld TRUE having HDL low NA (meaning they have truly MASLD)
+df$crypt_sld[df$hdl_new == "low"] <- NA
+table(df$crypt_sld, useNA = "ifany") # 1724 - 16 = 1708
+
+# Create a new column that categorizes triglyceride as low if below 1.7, else high (TG is mmol/L in UKB)
+df$tg_new <- ifelse(df$triglycerides_f30870_0_0 < 1.7 & df$triglycerides_f30870_1_0 < 1.7, "low", "high")
+table(df$crypt_sld, df$tg_new, useNA = "ifany")
+
+# Make those crypt_sld TRUE having TG high NA (meaning they have truly MASLD)
+df$crypt_sld[df$tg_new == "high"] <- NA
+table(df$crypt_sld, useNA = "ifany") # 1708 - 673 = 1035
+
+# Define the list of lipid-lowering medication codes
+lipid_drug_codes <- c(
+  # Statins
+  1140861958, # simvastatin
+  1140881748, # zocor (simvastatin)
+  1141200040, # zocor heart-pro (simvastatin)
+  1140888594, # fluvastatin
+  1140864592, # lescol (fluvastatin)
+  1140888648, # pravastatin
+  1140910632, # eptastatin
+  1140910654, # velastatin
+  1141146234, # atorvastatin
+  1141146138, # lipitor (atorvastatin)
+  1141192410, # rosuvastatin
+  1141192414, # crestor
+  # Ezetimibe
+  1141192736, # ezetimibe
+  1141192740, # ezetimib
+  # Niacin
+  1140910670  # niacin
+)
+
+# Function to detect drugs in medication columns
+find_lipid_drug_function <- function(df, codes) {
+  # Select the relevant columns
+  medication_cols <- df %>%
+    select(starts_with("treatmentmedication_code_f20003"))
+  
+  # Check for matches and convert to a logical matrix
+  match_matrix <- sapply(medication_cols, function(col) col %in% codes)
+  
+  # Create a logical vector for the oral lipid drug
+  df$oral_lipid_drug <- rowSums(match_matrix, na.rm = TRUE) > 0
+  return(df)
+}
+
+# Apply the function to the dataframe
+df <- find_lipid_drug_function(df, lipid_drug_codes)
+
+# View some rows where oral_lipid_drug is TRUE (checkup)
+df %>%
+  filter(oral_lipid_drug == TRUE) %>%
+  select(eid, oral_lipid_drug, starts_with("treatmentmedication_code_f20003")) %>%
+  head(10)  # Show first 10 such cases
+
+table(df$crypt_sld, df$oral_lipid_drug, useNA = "ifany")
+
+# Make those crypt_sld taking lipid lowering medication NA 
+df$crypt_sld[df$oral_lipid_drug == TRUE] <- NA
+table(df$crypt_sld, useNA = "ifany") # 1035 - 176 = 859
+
+# New hypertension column and make HT TRUE if not NA in date column 
+df$HT <- NA
+ht_non_na_dates <- df %>%
+  filter(!is.na(date_I10) | !is.na(date_I110) | !is.na(date_I119) | !is.na(date_I120) | !is.na(date_I129) | !is.na(date_I130) | !is.na(date_I131)
+         | !is.na(date_I132) | !is.na(date_I139) | !is.na(date_I150) | !is.na(date_I151) | !is.na(date_I152) | !is.na(date_I158) | !is.na(date_I159)) %>%
+  pull(eid)
+
+# Update the HT column
+df <- df %>%
+  mutate(HT = ifelse(eid %in% ht_non_na_dates, TRUE, HT))
+
+table(df$crypt_sld,df$HT, useNA = "ifany") 
+
+# Make those crypt_sld having hypertension NA 
+df$crypt_sld[df$HT == TRUE] <- NA
+table(df$crypt_sld, useNA = "ifany") # 859 - 210 = 649
+
+# Create a new column that categorizes HbA1c as low if below 39, else high (hba1c is mmol/mol in UKB)
+df$hba1c_new <- ifelse(df$glycated_haemoglobin_hba1c_f30750_0_0 < 39 | df$glycated_haemoglobin_hba1c_f30750_1_0 < 39, "low", "high")
+table(df$crypt_sld, df$hba1c_new, useNA = "ifany") # all low -> still TRUE crypt_sld
+
+# Now diabetes. First correct classification of T1D and T2D (e.g. several individuals with a diagnosis of both T1D and T2D). 
+# New T2D column and make T2D TRUE if not NA in date column 
+df$T2D <- NA
+t2d_non_na_dates <- df %>%
+  filter(!is.na(date_E11) | !is.na(date_E14)) %>%
+  pull(eid)
+
+# Update the T2D column
+df <- df %>%
+  mutate(T2D = ifelse(eid %in% t2d_non_na_dates, TRUE, T2D))
+
+# New T1D column and make T1D TRUE if not NA in date column 
+df$T1D <- NA
+t1d_non_na_dates <- df %>%
+  filter(!is.na(date_E10)) %>%
+  pull(eid)
+
+# Update the T1D column
+df <- df %>%
+  mutate(T1D = ifelse(eid %in% t1d_non_na_dates, TRUE, T1D))
+
+# Remove diabetes diagnosis if gestational diabetes only
+# df$gdmonly <- NA
+df$gdmonly[df$gestational_diabetes_only_f4041_0_0 == 1 | df$gestational_diabetes_only_f4041_1_0 == 1 | df$gestational_diabetes_only_f4041_2_0 == 1 | df$gestational_diabetes_only_f4041_3_0 == 1] <- T
+df$T1D[df$gdmonly == T & df$T2D == T] <- NA
+df$T2D[df$gdmonly == T & is.na(df$T1D)] <- NA
+df$T1D[df$gdmonly == T & is.na(df$T2D)] <- NA
+
+# Filter for oral antihyperglycemic drugs and insulin
+# Define the list of oral T2D medication codes (excl metformin which is not restricted to only T2D use)
+t2d_drug_codes <- c(
+  # Sulfonylureas
+  1140874718, 1140874744, 1140874746, 1141152590, 1141156984,
+  1140874646, 1141157284, 1140874652, 1140874674, 1140874728,
+  
+  # Others
+  1140868902, 1140868908, 1140857508, 1140882964,
+  
+  # Metglitinides
+  1141173882, 1141173786, 1141168660,
+  
+  # Glitazones
+  1141171646, 1141171652, 1141153254, 1141177600, 1141177606)
+
+# Function to detect oral T2D drugs in medication columns
+find_t2d_drug_function <- function(df, codes) {
+  # Select the relevant columns
+  medication_cols <- df %>%
+    select(starts_with("treatmentmedication_code_f20003"))
+  
+  # Check for matches and convert to a logical matrix
+  match_matrix <- sapply(medication_cols, function(col) col %in% codes)
+  
+  # Create a logical vector for the oral T2D drugs
+  df$oral_t2d_drug <- rowSums(match_matrix, na.rm = TRUE) > 0
+  return(df)
+}
+
+# Apply the function to the dataframe
+df <- find_t2d_drug_function(df, t2d_drug_codes)
+
+# Define the list of Metformin medication codes
+metformin_codes <- c(
+  1140884600,  # metformin
+  1140874686,  # glucophage 500 mg tablet
+  1141189090   # rosiglitazone 1mg / metformin 500mg tablet
+)
+
+# Function to detect Metformin drugs in medication columns
+find_metformin_function <- function(df, codes) {
+  # Select the relevant columns
+  medication_cols <- df %>%
+    select(starts_with("treatmentmedication_code_f20003"))
+  
+  # Check for matches and convert to a logical matrix
+  match_matrix <- sapply(medication_cols, function(col) col %in% codes)
+  
+  # Create a logical vector for Metformin use
+  df$metformin_use <- rowSums(match_matrix, na.rm = TRUE) > 0
+  return(df)
+}
+
+# Apply the function to the dataframe
+df <- find_metformin_function(df, metformin_codes)
+
+# Define the list of Insulin medication codes
+insulin_codes <- c(
+  1140883066  # insulin product
+)
+
+# Function to detect Insulin use in medication columns
+find_insulin_function <- function(df, codes) {
+  # Select the relevant columns
+  medication_cols <- df %>%
+    select(starts_with("treatmentmedication_code_f20003"))
+  
+  # Check for matches and convert to a logical matrix
+  match_matrix <- sapply(medication_cols, function(col) col %in% codes)
+  
+  # Create a logical vector for Insulin use
+  df$insulin_use <- rowSums(match_matrix, na.rm = TRUE) > 0
+  return(df)
+}
+
+# Apply the function to the dataframe
+df <- find_insulin_function(df, insulin_codes)
+
+# Make those individuals wihtout diabetes diagnosis as T2D if hba1c above 48:
+df$T2D[(df$glycated_haemoglobin_hba1c_f30750_0_0 > 48 | df$glycated_haemoglobin_hba1c_f30750_1_0 > 48) & (is.na(df$T2D) & is.na(df$T1D))] <-  T
+
+# Make those individuals without diabetes diagnosis as T2D if oral T2D medication (excluding metformin):
+df$T2D[df$oral_t2d_drug == T & (is.na(df$T2D) & is.na(df$T1D))] <- T
+
+# Make those T1D individuals on oral T2D drug medication T2D:
+df$T1D[(df$T2D == T & df$T1D == T) & (df$oral_t2d_drug == T | df$metformin_use == T)] <- NA
+df$T2D[df$T1D == T & (df$oral_t2d_drug == T | df$metformin_use == T)] <- T
+df$T1D[df$oral_t2d_drug == T | df$metformin_use == T] <- NA
+
+# Make those diagnosed <20 y age as T1D
+df$T2D[(df$age_diabetes_diagnosed_f2976_0_0 < 20 | df$age_diabetes_diagnosed_f2976_1_0 < 20 | df$age_diabetes_diagnosed_f2976_2_0 < 20 | df$age_diabetes_diagnosed_f2976_3_0 < 20 ) & df$T1D == T & df$T2D == T] <- NA
+
+# Make those with double diagnosis as T1D if insulin treatment within 1 year of diagnosis and actual insulin treatment:
+df$ins1y[df$started_insulin_within_one_year_diagnosis_of_diabetes_f2986_0_0 == 1 | df$started_insulin_within_one_year_diagnosis_of_diabetes_f2986_1_0 == 1 | df$started_insulin_within_one_year_diagnosis_of_diabetes_f2986_2_0 == 1 | df$started_insulin_within_one_year_diagnosis_of_diabetes_f2986_3_0 == 1] <- T 
+df$ins1y[is.na(df$ins1y)] <- NA
+df$T2D[df$T1D == T & df$T2D == T & (df$ins1y & df$insulin_treatment)] <- NA
+
+# Making those with double diagnosis T1D and T2D as T2D
+df$T1D[df$T1D == T & df$T2D == T] <- NA
+
+df %>%
+      count(T1D, T2D) # 790, 51608, respectively
+
+table(df$crypt_sld, df$T2D, useNA = "ifany") 
+
+# Make those crypt_sld having T2D NA 
+df$crypt_sld[df$T2D == TRUE] <- NA
+table(df$crypt_sld, useNA = "ifany") # 649 - 27 = 622 
+
+table(df$MASLD, df$crypt_sld, useNA = "ifany") 
+
+# Make those MASLD TRUE individuals who are crypt_sld TRUE NA
+df$MASLD[df$crypt_sld == TRUE] <- NA
+table(df$MASLD, useNA = "ifany") # 14183 - 622 = 13561
+```
+
+Defining ALD
+```{r echo=TRUE, results='hide'}
+# Add ALD K70
+df$ALD <- NA
+ald_non_na_dates <- df %>%
+  filter(!is.na(date_K70)) %>%
+  pull(eid)
+
+# Update the ALD column
+df <- df %>%
+  mutate(ALD = ifelse(eid %in% ald_non_na_dates, TRUE, ALD))
+
+# Add pdff > 5.5 for women and men based on alcohol intake (more than 350 g alcohol/week for women and 420 g alcohol/week for men. Between MASLD and ALD is MetALD (140-350 g alcohol for women and 210-420 g alcohol for men) which is not defined in this dataset
+df$ALD[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0 == "Female" &
+                 df$weekly_alcohol >= 43.8] <- T
+df$ALD[df$proton_density_fat_fraction_pdff_f40061_2_0 > 5.5 &
+                 df$sex_f31_0_0=="Male" &
+                 df$weekly_alcohol >= 52.5] <- T # 8 g alcohol in 1 unit
+```
+
+Healthy defined as bmi < 25, TG low, HDL high, HbA1c < 39, normal liver blood tests, no ICD diagnosis incl not having MASLD (as MASLD in this dataset is also identified on scan and not only ICD10), weakly alcohol consumption < 17.5 units alcohol/week for women and 26.25 units alcohol/week for men. In order to make healthy group as comparable to discovery heatlhy group as possible. 
+```{r echo=TRUE, results = 'hide'}
+# Create the alt_base_uln variable
+df$alt_base_uln <- with(df, ifelse(
+  (sex_f31_0_0 == "Female" & alanine_aminotransferase_f30620_0_0 < 45) |  
+  (sex_f31_0_0 == "Male" & alanine_aminotransferase_f30620_0_0 < 70),    
+  "normal",                                                              
+  "elevated"                                                             
+))
+
+# Create the ast_uln variable
+df$ast_uln <- with(df, ifelse(
+  (sex_f31_0_0 == "Female" & AST_base < 35) |  
+  (sex_f31_0_0 == "Male" & AST_base < 45),    
+  "normal",                                   
+  "elevated"                                  
+))
+
+# Create the alp_uln variable
+df$alp_uln <- with(df, ifelse(
+  ALP_base < 105,      
+  "normal",           
+  "elevated"          
+))
+
+# Create the ggt_uln variable
+df$ggt_uln <- with(df, ifelse(
+  (sex_f31_0_0 == "Female" & GGT_base < 75) |  
+  (sex_f31_0_0 == "Male" & GGT_base < 115),    
+  "normal",                                    
+  "elevated"                                   
+))
+
+# Create the bili_uln variable
+df$bili_uln <- with(df, ifelse(
+  bili_base < 25,      
+  "normal",          
+  "elevated"          
+))
+
+# Create Healthy variable
+df$Healthy <- with(df, ifelse(
+  bmi_new == "Below 25" &                           
+  tg_new == "low" &                                 
+  hdl_new == "high" &                               
+  hba1c_new == "low" &                              
+  no_icd10 == TRUE &                                
+  is.na(MASLD) &                                    
+  ((sex_f31_0_0 == "Female" & weekly_alcohol < 17.5) |  
+   (sex_f31_0_0 == "Male" & weekly_alcohol < 26.25)) &   
+  alt_base_uln == "normal" &                        
+  ast_uln == "normal" &                             
+  ggt_uln == "normal" &                             
+  alp_uln == "normal" &                             
+  bili_uln == "normal",                             
+  TRUE, NA
+))
+
+table(df$Healthy, useNA = "ifany")
+dim(df)
+df[1:3,974:978]
+```
+
+### Tidy up dataframe
+```{r echo=TRUE, results='hide'}
+# Make NA -> FALSE
+df_final <- df %>%
+    replace_na(list(
+        AIH = FALSE,
+        PBC = FALSE,
+        AIH.PBC = FALSE,
+        MASLD = FALSE,
+        ALD = FALSE,
+        crypt_sld = FALSE,
+        cir = FALSE,
+        Healthy = FALSE))
+
+# Clean up dataframe
+df_final <- df_final %>%
+    select(eid = eid,
+           Age = age_when_attended_assessment_centre_f21003_0_0,
+           Sex = sex_f31_0_0,
+           hba1c = glycated_haemoglobin_hba1c_f30750_0_0,
+           BMI = body_mass_index_bmi_f21001_0_0,
+           ethnicity = ethnic_background_f21000_0_0,
+           ALT = alanine_aminotransferase_f30620_0_0,
+           ALT1 = alanine_aminotransferase_f30620_1_0,
+           alt_base_uln,
+           AST = AST_base,
+           ast_uln,
+           ALP = ALP_base,
+           alp_uln,
+           Bili = bili_base,
+           bili_uln,
+           GGT = GGT_base,
+           ggt_uln,
+           Platelet = platelet_count_f30080_0_0,
+           Albumin = albumin_f30600_0_0,
+           AIH,
+           PBC,
+           AIH.PBC,
+           MASLD,
+           masld_icd,
+           masld_icd_prev,
+           masld_icd_inc,
+           masld_pdff,
+           ALD,
+           crypt_sld,
+           cir,
+           Healthy,
+           date_K732,
+           date_K738,
+           date_K754,
+           date_K743,
+           date_K746,
+           date_I850,
+           date_I859,
+           date_I982,
+           date_I983,
+           date_K729,
+           date_K703,
+           date_K766,
+           date_K767,
+           enroll_date
+           )
+```
+
+### Make prevalent and incident cases
+AIH cases with an AIH diagnosis (any of 3) before enrollment date are prevalent, rest incident
+```{r echo=TRUE, results = 'hide'}
+table(df_final$AIH, useNA = "ifany")
+
+# Calculate aih_first_date
+df_final$aih_first_date <- pmin(df_final$date_K732, df_final$date_K738, df_final$date_K754, na.rm = TRUE)
+
+# Check the first few values
+df_final$aih_first_date[df_final$AIH == TRUE][1:10]
+
+# Now assign NA to aih_first_date where AIH is not TRUE (as some "AIH cases" with concurrent PBC,HBC or HCV were made AIH FALSE initially)
+df_final$aih_first_date[df_final$AIH == FALSE] <- NA
+
+# Create the prev_AIH variable
+df_final$prev_AIH <- with(df_final, 
+                          ifelse(!is.na(aih_first_date) & aih_first_date < enroll_date, 
+                                 TRUE, FALSE))
+
+# View the resulting dataframe
+table(df_final$prev_AIH, useNA = "ifany")
+
+# Filter the dataframe where prev_AIH is TRUE
+df_inspect_prev_AIH <- df_final[df_final$prev_AIH == TRUE, ]
+
+# Visual inspection of the first few rows where prev_AIH == TRUE
+print(df_inspect_prev_AIH[, c("eid","AIH", "date_K732", "date_K738", "date_K754", "aih_first_date", "enroll_date", "prev_AIH")])
+
+# Create the inc_AIH variable
+df_final$inc_AIH <- with(df_final, 
+                         ifelse(!is.na(aih_first_date) & aih_first_date > enroll_date, 
+                                TRUE, FALSE))
+
+# View the resulting dataframe
+table(df_final$inc_AIH)
+
+# Filter the dataframe where inc_AIH is TRUE
+df_inspect_inc_AIH <- df_final[df_final$inc_AIH == TRUE, ]
+
+# Visual inspection of the first few rows where inc_AIH == TRUE
+print(df_inspect_inc_AIH[, c("eid","AIH", "date_K732", "date_K738", "date_K754", "aih_first_date", "enroll_date", "inc_AIH")])
+
+df_final %>%
+    count(AIH, prev_AIH, inc_AIH)
+```
+
+PBC cases with a PBC diagnosis before enrollment date are prevalent, rest incident
+```{r echo=TRUE, results = 'hide'}
+table(df_final$PBC, useNA = "ifany")
+df_final$pbc_date <- df_final$date_K743
+
+# Create the prev_PBC variable
+df_final$prev_PBC <- with(df_final, 
+                          ifelse(PBC == TRUE & pbc_date < enroll_date, TRUE, FALSE))
+
+# View the resulting dataframe
+table(df_final$prev_PBC, useNA = "ifany")
+
+# Filter the dataframe where prev_PBC is TRUE
+df_inspect_prev_PBC <- df_final[df_final$prev_PBC == TRUE, ]
+
+# Visual inspection of the first few rows where prev_AIH == TRUE
+print(df_inspect_prev_PBC[, c("eid","PBC", "pbc_date", "enroll_date", "prev_PBC")])
+
+# Create the inc_PBC variable
+df_final$inc_PBC <- with(df_final, 
+                         ifelse(PBC == TRUE & pbc_date > enroll_date, TRUE, FALSE))
+
+# View the resulting dataframe
+table(df_final$inc_PBC)
+
+# Filter the dataframe where inc_PBC is TRUE
+df_inspect_inc_PBC <- df_final[df_final$inc_PBC == TRUE, ]
+
+# Visual inspection of the first few rows where prev_PBC == TRUE
+print(df_inspect_inc_PBC[, c("eid","PBC", "pbc_date", "enroll_date", "inc_PBC")])
+
+df_final %>%
+    count(PBC, prev_PBC, inc_PBC)
+```
+
+cir cases with a cir diagnosis before enrollment date are prevalent, rest incident
+```{r echo=TRUE, results = 'hide'}
+# Create the cir_first_date variable to capture the earliest diagnosis date
+df_final$cir_first_date <- with(df_final, 
+                                pmin(date_K746, date_I850, date_I859, date_I982, date_I983, 
+                                     date_K729, date_K703, date_K766, date_K767, na.rm = TRUE))
+
+# Check the output for rows where cir_first_date is not NA
+df_inspect_cir <- df_final[!is.na(df_final$cir_first_date), ]
+print(head(df_inspect_cir[, c("date_K746", "date_I850", "date_I859", "date_I982", "date_I983", 
+                              "date_K729", "date_K703", "date_K766", "date_K767", "cir_first_date")], 10))
+
+# Create the prev_cir variable (TRUE if cir_first_date is before enroll_date)
+df_final$prev_cir <- with(df_final, 
+                          ifelse(!is.na(cir_first_date) & cir_first_date < enroll_date, TRUE, FALSE))
+
+# Filter the dataframe where prev_cir is TRUE
+df_inspect_prev_cir <- df_final[df_final$prev_cir == TRUE, ]
+
+# Visual inspection of the first few rows where prev_cir == TRUE
+print(df_inspect_prev_cir[, c("eid","cir_first_date", "enroll_date", "prev_cir")])
+
+# Create the inc_cir variable (TRUE if cir_first_date is after enroll_date)
+df_final$inc_cir <- with(df_final, 
+                         ifelse(!is.na(cir_first_date) & cir_first_date > enroll_date, TRUE, FALSE))
+
+# Filter the dataframe where inc_cir is TRUE
+df_inspect_inc_cir <- df_final[df_final$inc_cir == TRUE, ]
+
+# Visual inspection of the first few rows where inc_cir == TRUE
+print(df_inspect_inc_cir[, c("eid","cir_first_date", "enroll_date", "inc_cir")])
+
+df_final %>%
+    count(cir, prev_cir, inc_cir)
+```
+
+### Ethnicity
+```{r echo=TRUE, results='hide'}
+# All ethnic groups
+df_final$ethnic_all <- df_final$ethnicity
+df_final$ethnic_all[df_final$ethnic_all=="Caribbean"] <- 4001
+df_final$ethnic_all[df_final$ethnic_all=="Indian"] <- 3001
+df_final$ethnic_all[df_final$ethnic_all=="White"] <- 1
+df_final$ethnic_all[df_final$ethnic_all=="White and Black Caribbean"] <- 2001
+df_final$ethnic_all[df_final$ethnic_all=="British"] <- 1001
+df_final$ethnic_all[df_final$ethnic_all=="Pakistani"] <- 3002
+df_final$ethnic_all[df_final$ethnic_all=="Mixed"] <- 2
+df_final$ethnic_all[df_final$ethnic_all=="African"] <- 4002
+df_final$ethnic_all[df_final$ethnic_all=="Irish"] <- 1002
+df_final$ethnic_all[df_final$ethnic_all=="White and Black African"] <- 2002
+df_final$ethnic_all[df_final$ethnic_all=="Bangladeshi"] <- 3003
+df_final$ethnic_all[df_final$ethnic_all=="Asian or Asian British"] <- 3
+df_final$ethnic_all[df_final$ethnic_all=="Any other Black background"] <- 4003
+df_final$ethnic_all[df_final$ethnic_all=="Any other white background"] <- 1003
+df_final$ethnic_all[df_final$ethnic_all=="White and Asian"] <- 2003
+df_final$ethnic_all[df_final$ethnic_all=="Any other Asian background"] <- 3004
+df_final$ethnic_all[df_final$ethnic_all=="Black or Black British"] <- 4
+df_final$ethnic_all[df_final$ethnic_all=="Any other mixed background"] <- 2004
+df_final$ethnic_all[df_final$ethnic_all=="Chinese"] <- 5
+df_final$ethnic_all[df_final$ethnic_all=="Other ethnic group"] <- 6
+df_final$ethnic_all[df_final$ethnic_all=="Do not know"] <- -1
+df_final$ethnic_all[df_final$ethnic_all=="Prefer not to answer"] <- -3
+
+#Main ethnic groups (NB this makes some assumptions i.e. British is white, and does not include mixed, Chinese or other Asian)
+
+df_final$ethnic <- df_final$ethnic_all
+df_final$ethnic[df_final$ethnic_all==1001] <- 1
+df_final$ethnic[df_final$ethnic_all==1002] <- 1
+df_final$ethnic[df_final$ethnic_all==1003] <- 1
+df_final$ethnic[df_final$ethnic_all==3] <- 2
+df_final$ethnic[df_final$ethnic_all==3001] <- 2
+df_final$ethnic[df_final$ethnic_all==3002] <- 2
+df_final$ethnic[df_final$ethnic_all==3003] <- 2
+df_final$ethnic[df_final$ethnic_all==4] <- 3
+df_final$ethnic[df_final$ethnic_all==4001] <- 3
+df_final$ethnic[df_final$ethnic_all==4002] <- 3
+df_final$ethnic[df_final$ethnic_all==4003] <- 3
+df_final$ethnic[df_final$ethnic_all==2] <- 4
+df_final$ethnic[df_final$ethnic_all==2001] <- 4
+df_final$ethnic[df_final$ethnic_all==2002] <- 4
+df_final$ethnic[df_final$ethnic_all==2003] <- 4
+df_final$ethnic[df_final$ethnic_all==2004] <- 4
+df_final$ethnic[df_final$ethnic_all==3004] <- 4
+df_final$ethnic[df_final$ethnic_all==5] <- 4
+df_final$ethnic[df_final$ethnic_all==6] <- 4
+df_final$ethnic[df_final$ethnic_all==-1] <- NA
+df_final$ethnic[df_final$ethnic_all==-3] <- NA
+
+count(df_final,ethnic_all) # empty row, should be NA
+df_final$ethnic_all # empty row = ""
+
+df_final$ethnic[df_final$ethnic_all==""] <- NA
+
+# 1"White European" 2"South Asian" 3"African Caribbean" 4"Mixed or other"
+
+count(df_final,ethnic)
+```
+
+### Clean up dataframe
+```{r echo=TRUE, results = 'hide'}
+dim(df_final)
+
+df_final <- df_final %>%
+  select(-starts_with("date_"), -ethnicity, -ethnic_all)
+
+dim(df_final)
+```
+
+### Prevalence estimates
+```{r}
+# Prevalence estimate (n(diagnosis)/total count)
+count(df_final)
+table(df_final$AIH, useNA = "ifany")
+table(df_final$PBC, useNA = "ifany")
+table(df_final$AIH.PBC, useNA = "ifany")
+table(df_final$MASLD, useNA = "ifany")
+table(df_final$crypt_sld, useNA = "ifany")
+table(df_final$ALD, useNA = "ifany")
+table(df_final$cir, useNA = "ifany")
+table(df_final$Healthy, useNA = "ifany")
+```
+
+### Save dataframe
+```{r}
+summary(df_final)
+
+write.csv(
+  df_final,
+  here("data/AILD_pheno_UKB_for_proteomics_github.csv"),
+  row.names = FALSE
+)
+
+```
